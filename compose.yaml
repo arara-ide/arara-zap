@@ -1,9 +1,10 @@
 services:
   zap:
-    image: ghcr.io/arara-ide/arara-zap:0.1.0
+    image: ghcr.io/arara-ide/arara-zap:0.2.0
     build: .
     environment:
       ZAP_PASSWORD: ${ZAP_PASSWORD:?Defina ZAP_PASSWORD}
+      ZAP_LANG: ${ZAP_LANG:-en}
       ZAP_ALLOWED_NUMBER: ${ZAP_ALLOWED_NUMBER:-}
     ports: ["127.0.0.1:7310:7310"]
     volumes: ["zap-data:/data"]

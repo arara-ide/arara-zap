@@ -1,15 +1,16 @@
+import { t } from './i18n.mjs';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { BufferJSON, initAuthCreds, proto } from '@whiskeysockets/baileys';
 // One encrypted atomic snapshot; serialized writes prevent lost key updates.
-export async function authStore(path, key) {
+export async function authStore(path, key, locale = 'en') {
   let data;
   try {
     const raw = await readFile(path);
     const cipher = createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
     cipher.setAuthTag(raw.subarray(12, 28));
     data = JSON.parse(Buffer.concat([cipher.update(raw.subarray(28)), cipher.final()]).toString(), BufferJSON.reviver);
-  } catch (e) { if (e.code !== 'ENOENT') throw Error('Cannot decrypt WhatsApp session; restore the original password.'); data = { creds: initAuthCreds(), keys: {} }; }
+  } catch (e) { if (e.code !== 'ENOENT') throw Error(t(locale, 'decrypt')); data = { creds: initAuthCreds(), keys: {} }; }
   let chain = Promise.resolve();
   const save = () => {
     const snapshot = JSON.stringify(data, BufferJSON.replacer);

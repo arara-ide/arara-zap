@@ -1,1 +1,22 @@
-{"name":"arara-zap","version":"0.1.0","description":"Conexão WhatsApp privada para Arara Code","type":"module","license":"MIT","engines":{"node":">=22.16"},"scripts":{"dev":"node --env-file-if-exists=.env --watch src/index.js","start":"node --env-file-if-exists=.env src/index.js","test":"node --test","build":"node --check src/index.js"},"dependencies":{"@whiskeysockets/baileys":"7.0.0-rc14","ws":"8.22.0","pino":"10.1.0","qrcode":"1.5.4"}}
+{
+  "name": "arara-zap",
+  "version": "0.2.0",
+  "description": "Conex\u00e3o WhatsApp privada para Arara Code",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "scripts": {
+    "dev": "node --watch src/run.js",
+    "start": "node src/run.js",
+    "test": "node --test",
+    "build": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "ws": "8.22.0",
+    "pino": "10.1.0",
+    "qrcode": "1.5.4"
+  }
+}
