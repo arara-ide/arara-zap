@@ -49,9 +49,9 @@ O Compose publica só `127.0.0.1:7310`. Use essa URL e a senha manualmente na ID
 - Desafio único HMAC, chave derivada por scrypt, timeout de autenticação, limites de payload/conexões/requisições, heartbeat e backpressure. Uma IDE por serviço.
 - QR e mensagens só chegam ao cliente autenticado. Senha no cofre da IDE, nunca na webview ou em logs.
 - Sessão WhatsApp criptografada com AES-256-GCM e gravação atômica. Diretório privado (0700), arquivos 0600 no Unix; no Windows use uma conta individual e ACL privada na pasta do usuário. Administradores e processos da mesma conta ainda podem ler credenciais.
-- Um número exato autorizado. Grupos, mensagens próprias, mídias e histórico são ignorados. Nada de shell, leitura de arquivos ou envio a destinatários arbitrários pelo protocolo.
+- Um número autorizado, resolvido pelo próprio WhatsApp para seu identificador canônico. Não há equivalência de números adivinhada localmente. Grupos, mensagens próprias, mídias e histórico são ignorados. Nada de shell, leitura de arquivos ou envio a destinatários arbitrários pelo protocolo.
 - Sem fila persistente: pedidos com IDE desconectada não executam depois. Polls recentes ficam só em memória (100). Sem reenvio automático de mensagens com entrega incerta.
-- Preserve a senha para abrir a sessão criptografada. Para novo pareamento, pare o serviço e remova `session.enc` do diretório de dados. Para revogar a sessão, use Dispositivos conectados no celular.
+- Preserve a senha para abrir a sessão criptografada. Ao desvincular pelo celular, a sessão revogada é substituída automaticamente e um novo QR aparece na IDE conectada. Para revogar a sessão, use Dispositivos conectados no celular.
 - Um processo por diretório. Se houver queda abrupta, confira que o serviço parou antes de remover `process.lock`. Desconectar a IDE fecha também a conexão WhatsApp; reconectar reabre a sessão.
 
 ## Protocolo v1

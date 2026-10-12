@@ -22,8 +22,15 @@ export async function authStore(path, key, locale = 'en') {
     });
     return chain;
   };
-  return { state: { creds: data.creds, keys: {
-    get: async (type, ids) => Object.fromEntries(ids.map(id => { let value = data.keys[`${type}:${id}`]; if (type === 'app-state-sync-key' && value) value = proto.Message.AppStateSyncKeyData.fromObject(value); return [id, value]; })),
-    set: async changes => { for (const [type, entries] of Object.entries(changes)) for (const [id, value] of Object.entries(entries)) { if (value) data.keys[`${type}:${id}`] = value; else delete data.keys[`${type}:${id}`]; } await save(); },
-  } }, saveCreds: save, flush: () => chain };
+  const state = () => {
+    const current = data;
+    return { creds: current.creds, keys: {
+    get: async (type, ids) => Object.fromEntries(ids.map(id => { let value = current.keys[`${type}:${id}`]; if (type === 'app-state-sync-key' && value) value = proto.Message.AppStateSyncKeyData.fromObject(value); return [id, value]; })),
+    set: async changes => { if (current !== data) return; for (const [type, entries] of Object.entries(changes)) for (const [id, value] of Object.entries(entries)) { if (value) data.keys[`${type}:${id}`] = value; else delete data.keys[`${type}:${id}`]; } await save(); },
+    } };
+  };
+  return { get state() { return state(); }, saveCreds: save, flush: () => chain, reset: async () => {
+    data = { creds: initAuthCreds(), keys: {} };
+    await save();
+  } };
 }
