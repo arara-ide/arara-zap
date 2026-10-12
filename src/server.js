@@ -1,0 +1,50 @@
+import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
+import { WebSocketServer } from 'ws';
+import { verify, validateCommand } from './security.js';
+export function createZapServer({ key, host = '127.0.0.1', port = 7310, number, adapterFactory }) {
+  let owner, allowed = number, adapter;
+  const server = createServer((req, res) => { res.writeHead(404); res.end(); });
+  server.maxConnections = 32; server.maxHeadersCount = 32; server.headersTimeout = 5000; server.requestTimeout = 5000; server.keepAliveTimeout = 1000;
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 32768, perMessageDeflate: false });
+  let windowStart = Date.now(), attempts = 0;
+  server.on('upgrade', (req, socket, head) => {
+    if (Date.now() - windowStart > 60000) { attempts = 0; windowStart = Date.now(); }
+    if (req.url !== '/zap' || req.headers.origin || owner || ++attempts > 30 || wss.clients.size >= 4) { socket.destroy(); return; }
+    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws));
+  });
+  const send = (ws, value) => { if (ws.readyState !== 1) return; if (ws.bufferedAmount > 65536) { ws.terminate(); return; } ws.send(JSON.stringify(value)); };
+  wss.on('connection', ws => {
+    const nonce = randomBytes(32).toString('hex');
+    const timeout = setTimeout(() => ws.terminate(), 5000);
+    let authenticated = false, processing = false, count = 0, since = Date.now();
+    ws.alive = true; ws.on('pong', () => { ws.alive = true; });
+    send(ws, { type: 'challenge', version: 1, nonce });
+    ws.on('message', async (raw, binary) => {
+      try {
+        if (binary) throw Error('Binary unsupported');
+        const m = JSON.parse(raw.toString());
+        if (!authenticated) {
+          if (m.type !== 'auth' || !/^\d{10,15}$/.test(m.number) || (number && number !== m.number) || !verify(key, nonce, m.number, m.proof) || owner) { ws.close(1008, 'Authentication failed'); return; }
+          authenticated = true; clearTimeout(timeout); owner = ws; allowed = m.number;
+          send(ws, { type: 'ready' });
+          adapter ||= adapterFactory(value => { if (owner) send(owner, value); }, () => allowed);
+          const snapshot = adapter.snapshot();
+          if (snapshot.qr) send(ws, { type: 'qr', qr: snapshot.qr });
+          send(ws, { type: 'status', status: snapshot.ready ? 'WhatsApp conectado' : 'Aguardando WhatsApp' });
+          return;
+        }
+        if (Date.now() - since > 60000) { since = Date.now(); count = 0; }
+        if (++count > 120 || processing) { ws.close(1008, 'Request limit'); return; }
+        validateCommand(m); processing = true;
+        try { const result = await adapter.command(m); send(ws, { type: 'result', id: m.id, result }); }
+        catch { send(ws, { type: 'result', id: m.id, error: 'Não foi possível enviar ao WhatsApp.' }); }
+        finally { processing = false; }
+      } catch { ws.close(1008, 'Invalid request'); }
+    });
+    ws.on('error', () => {});
+    ws.on('close', () => { clearTimeout(timeout); if (owner === ws) { owner = undefined; adapter?.close(); adapter = undefined; } });
+  });
+  const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!ws.alive) ws.terminate(); else { ws.alive = false; ws.ping(); } } }, 15000);
+  return { server, async listen() { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); }); return server.address(); }, async close() { clearInterval(heartbeat); adapter?.close(); for (const ws of wss.clients) ws.terminate(); wss.close(); await new Promise(resolve => server.close(resolve)); } };
+}
