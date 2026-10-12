@@ -43,6 +43,12 @@ docker compose down
 
 O Compose publica só `127.0.0.1:7310`. Use essa URL e a senha manualmente na IDE (Docker não compartilha o descritor do host). Para servidor, use proxy TLS e rede privada do Docker; mantenha a porta bloqueada externamente. O volume `zap-data` preserva a sessão. Imagens dos releases: `ghcr.io/arara-ide/arara-zap:<versão>` para amd64/arm64; a Action publica ao publicar um GitHub Release com tag `vX.Y.Z`.
 
+## Releases e atualização automática
+
+Após um push na `main`, o CI testa Linux, Windows e macOS com Node 22 e 24. Se todos passarem, publica a release `vX.Y.Z` conforme a versão de `package.json` e publica a imagem Docker no mesmo fluxo. Antes de publicar novas alterações, aumente a versão em `package.json` e `package-lock.json` (por exemplo, `npm version patch --no-git-tag-version`). Uma tag existente nunca é movida para outro commit.
+
+Ao iniciar, o arara-zap consulta a última release estável e atualiza somente se sua versão for maior que a instalada. Alterações locais impedem a substituição automática. A instalação anterior fica preservada em uma pasta de backup.
+
 ## Segurança e operação
 
 - Somente `/zap` aceita upgrade; HTTP comum retorna 404. WebSocket também precisa de autenticação; o transporte sozinho não garante segurança.
