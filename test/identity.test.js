@@ -29,3 +29,12 @@ test('lookup failure never guesses ninth-digit equivalence or accepts another nu
     await assert.rejects(identity.destination());
   }
 });
+test('self chat accepts the account own messages only when it is the configured destination', async () => {
+  const self = whatsappIdentity({ user: { id: '5511999999999:4@s.whatsapp.net' } }, '5511999999999');
+  assert.equal(await self.selfChat(), true);
+  assert.equal(await self.accepts({ remoteJid: '5511999999999@s.whatsapp.net', fromMe: true }), true);
+  assert.equal(await self.accepts({ remoteJid: '5511888888888@s.whatsapp.net', fromMe: true }), false);
+  const other = whatsappIdentity({ user: { id: '5511888888888@s.whatsapp.net' } }, '5511999999999');
+  assert.equal(await other.selfChat(), false);
+  assert.equal(await other.accepts({ remoteJid: '5511999999999@s.whatsapp.net', fromMe: true }), false);
+});

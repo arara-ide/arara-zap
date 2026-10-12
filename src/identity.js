@@ -11,8 +11,12 @@ export function whatsappIdentity(socket, number) {
     if (matches.length !== 1) throw Error('Authorized WhatsApp number could not be resolved');
     return jidNormalizedUser(matches[0].jid);
   })();
-  return { destination, async accepts(key) {
-    if (key.fromMe) return false;
+  const selfChat = async () => {
+    const account = jidNormalizedUser(socket.user?.id || '');
+    return account.endsWith('@s.whatsapp.net') && account === await destination();
+  };
+  return { destination, selfChat, async accepts(key) {
+    if (key.fromMe && !await selfChat().catch(() => false)) return false;
     const primary = jidNormalizedUser(key.remoteJid || '');
     if (!primary.endsWith('@s.whatsapp.net') && !primary.endsWith('@lid')) return false;
     let sender = primary;

@@ -1,6 +1,6 @@
 # Arara Zap
 
-Conecta o WhatsApp ao Arara Code diretamente por WebSocket. Node simples, sem API REST, painel web, banco externo ou relay no ac-services. Use `!arara` no WhatsApp para escolher projeto, assistente, modelo, esforço, aprovar ações e acompanhar respostas. A IDE precisa continuar aberta e o projeto precisa ser confiável.
+Conecta o WhatsApp ao Arara Code diretamente por WebSocket. Node simples, sem API REST, painel web, banco externo ou relay no ac-services. Envie `arara` (sem distinguir maiúsculas) no WhatsApp para escolher projeto, assistente, modelo, esforço, aprovar ações e acompanhar respostas. A IDE precisa continuar aberta e o projeto precisa ser confiável.
 
 Base de conexão: [Baileys](https://github.com/WhiskeySockets/Baileys), também usado no wa-dialogue. Implementação independente, licença MIT. Integração não oficial do WhatsApp; compatibilidade depende do serviço e do Baileys.
 
@@ -15,7 +15,7 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-Em Arara Code → Configurações → WhatsApp, escolha **Nesta máquina**, informe o número autorizado com DDI e escolha projetos. Salve e conecte. O QR aparece na IDE; no celular da sessão, abra **Dispositivos conectados → Conectar dispositivo**. Envie `!arara` a partir do número autorizado (outro número).
+Em Arara Code → Configurações → WhatsApp, escolha **Nesta máquina**, informe o número autorizado com DDI e escolha projetos. Salve e conecte. O QR aparece na IDE; no celular da sessão, abra **Dispositivos conectados → Conectar dispositivo**. Envie `arara` a partir do número autorizado, inclusive em uma conversa consigo mesmo.
 
 O modo local cria uma senha aleatória e um descritor em `~/.arara-zap/connection.json` (Windows: pasta do seu usuário). A IDE lê somente esse arquivo local. Não existe senha embutida na IDE ou confiança em headers. Se configurar `ZAP_DATA_DIR`, use a URL e senha manualmente. A IDE também oferece **Iniciar arara-zap instalado**: procura pastas usuais e próximas ao projeto, ou permite selecionar a instalação; confirma o caminho antes de executar `npm run dev`. Instale dependências antes.
 
@@ -49,14 +49,14 @@ O Compose publica só `127.0.0.1:7310`. Use essa URL e a senha manualmente na ID
 - Desafio único HMAC, chave derivada por scrypt, timeout de autenticação, limites de payload/conexões/requisições, heartbeat e backpressure. Uma IDE por serviço.
 - QR e mensagens só chegam ao cliente autenticado. Senha no cofre da IDE, nunca na webview ou em logs.
 - Sessão WhatsApp criptografada com AES-256-GCM e gravação atômica. Diretório privado (0700), arquivos 0600 no Unix; no Windows use uma conta individual e ACL privada na pasta do usuário. Administradores e processos da mesma conta ainda podem ler credenciais.
-- Um número autorizado, resolvido pelo próprio WhatsApp para seu identificador canônico. Não há equivalência de números adivinhada localmente. Grupos, mensagens próprias, mídias e histórico são ignorados. Nada de shell, leitura de arquivos ou envio a destinatários arbitrários pelo protocolo.
+- Um número autorizado, resolvido pelo próprio WhatsApp para seu identificador canônico. Não há equivalência de números adivinhada localmente. Grupos, mídias e histórico são ignorados. Mensagens próprias só entram quando o número configurado é a própria conta; todos os textos e títulos de enquetes do bot recebem `🦜 | ` e são ignorados na entrada da conversa consigo mesmo para impedir loop. Nada de shell, leitura de arquivos ou envio a destinatários arbitrários pelo protocolo.
 - Sem fila persistente: pedidos com IDE desconectada não executam depois. Polls recentes ficam só em memória (100). Sem reenvio automático de mensagens com entrega incerta.
 - Preserve a senha para abrir a sessão criptografada. Ao desvincular pelo celular, a sessão revogada é substituída automaticamente e um novo QR aparece na IDE conectada. Para revogar a sessão, use Dispositivos conectados no celular.
 - Um processo por diretório. Se houver queda abrupta, confira que o serviço parou antes de remover `process.lock`. Desconectar a IDE fecha também a conexão WhatsApp; reconectar reabre a sessão.
 
 ## Protocolo v1
 
-Servidor envia `{type:"challenge",version:1,nonce}`. Cliente responde `{type:"auth",number,proof}`; proof é HMAC-SHA256 da string `arara-zap/v1:<nonce>:<number>`, com chave scrypt(senha, `arara-zap/v1`, 32). Após `{type:"ready"}`, aceita `{id,op:"send",text}` e `{id,op:"poll",title,values}`; retorna `{type:"result",id,result,error?}`. Eventos: `qr`, `status`, `message` e votos como `message.poll={id,option}`. Nenhuma operação permite definir outro destinatário.
+Servidor envia `{type:"challenge",version:1,nonce}`. Cliente responde `{type:"auth",number,proof}`; proof é HMAC-SHA256 da string `arara-zap/v1:<nonce>:<number>`, com chave scrypt(senha, `arara-zap/v1`, 32). Após `{type:"ready"}`, aceita `{id,op:"send",text}`, `{id,op:"poll",title,values}` e `{id,op:"edit",messageId,text}`; retorna `{type:"result",id,result,error?}`. `send` retorna o ID da mensagem; `edit` só aceita ID de texto enviado ao destino autorizado pelo socket atual. Eventos: `qr`, `status`, `message` e votos como `message.poll={id,option}`. Nenhuma operação permite definir outro destinatário.
 
 ```sh
 npm test

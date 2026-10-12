@@ -12,7 +12,12 @@ test('challenge binds number and nonce; malformed proofs fail closed', () => {
   assert.ok(authorized(`${number}@s.whatsapp.net`, number));
   for (const jid of [`${number}@g.us`, `${number}@s.whatsapp.net.extra`, '123@lid']) assert.equal(authorized(jid, number), false);
   assert.throws(() => validateCommand({ id: 'id', op: 'send', text: 'x'.repeat(3501) }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'send', text: 'x'.repeat(3496) }));
+  assert.deepEqual(validateCommand({ id: 'id', op: 'edit', messageId: 'sent-id', text: 'updated' }).op, 'edit');
+  assert.throws(() => validateCommand({ id: 'id', op: 'edit', messageId: '../../other', text: 'updated' }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'edit', messageId: 'sent-id', text: 'x'.repeat(3501) }));
   assert.throws(() => validateCommand({ id: 'id', op: 'poll', title: 'menu', values: ['same', 'same'] }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'poll', title: 'x'.repeat(200), values: ['A', 'B'] }));
 });
 const next = ws => new Promise((resolve, reject) => { ws.once('message', raw => resolve(JSON.parse(raw))); ws.once('error', reject); });
 test('WebSocket authenticates before exposing QR or messages, limits destination and rejects wrong credentials', async t => {
@@ -25,5 +30,7 @@ test('WebSocket authenticates before exposing QR or messages, limits destination
   const ws = new WebSocket(`ws://127.0.0.1:${address.port}/zap`); t.after(() => ws.terminate()); const c = await next(ws);
   const ready = next(ws); ws.send(JSON.stringify({ type: 'auth', number: '5511999999999', proof: proof(key, c.nonce, '5511999999999') })); assert.equal((await ready).type, 'ready');
   const response = next(ws); ws.send(JSON.stringify({ id: 'one', op: 'poll', title: 'Menu', values: ['A', 'B'] })); assert.equal((await response).result, 'poll-id'); assert.equal(commands.length, 1);
+  const edited = next(ws); ws.send(JSON.stringify({ id: 'edit', op: 'edit', messageId: 'sent-id', text: '🦜 | resposta\n\nPedido encerrado.' }));
+  assert.equal((await edited).result, 'poll-id'); assert.deepEqual(commands[1], { id: 'edit', op: 'edit', messageId: 'sent-id', text: '🦜 | resposta\n\nPedido encerrado.' });
   const rejected = new Promise(resolve => ws.once('close', resolve)); ws.send(JSON.stringify({ id: 'two', op: 'execute', command: 'id' })); await rejected;
 });

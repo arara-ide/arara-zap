@@ -31,10 +31,37 @@ test('send and poll use only the authorized number and retain original poll for 
   const f = setup(); t.after(f.adapter.close); const socket = f.sockets[0];
   await assert.rejects(f.adapter.command({ op: 'send', text: 'hello' }), /desconectado/);
   socket.ev.emit('connection.update', { connection: 'open' });
-  await f.adapter.command({ op: 'send', text: 'hello', number: 'other' });
+  const sentId = await f.adapter.command({ op: 'send', text: 'hello', number: 'other' });
   const id = await f.adapter.command({ op: 'poll', title: 'menu', values: ['A', 'B'] });
   assert.equal(socket.sent.every(m => m.jid === '5511999999999@s.whatsapp.net'), true);
+  assert.equal(socket.sent[0].content.text, '🦜 | hello');
+  assert.equal(socket.sent[1].content.poll.name, '🦜 | menu');
   assert.equal(socket.sent[1].content.poll.selectableCount, 1); assert.ok(await socket.config.getMessage({ id }));
+  await f.adapter.command({ op: 'edit', messageId: sentId, text: 'hello\n\nPedido encerrado.' });
+  assert.deepEqual(socket.sent[2].content, { text: '🦜 | hello\n\nPedido encerrado.', edit: { id: sentId } });
+  assert.ok(socket.sent.every(({ content }) => (content.text || content.poll?.name).startsWith('🦜 | ')));
+  await assert.rejects(f.adapter.command({ op: 'edit', messageId: id, text: 'unrelated' }), /indisponível/);
+  await assert.rejects(f.adapter.command({ op: 'edit', messageId: sentId, text: 'changed old answer' }), /indisponível/);
+});
+test('self chat accepts typed messages and ignores prefixed assistant replies without looping', async t => {
+  const f = setup(); t.after(f.adapter.close); const socket = f.sockets[0];
+  socket.user = { id: '5511999999999:1@s.whatsapp.net' };
+  socket.ev.emit('connection.update', { connection: 'open' });
+  await f.adapter.command({ op: 'send', text: 'resposta da IA' });
+  assert.equal(socket.sent.at(-1).content.text, '🦜 | resposta da IA');
+  await f.adapter.command({ op: 'send', text: '🦜 | Conversa concluída.' });
+  assert.equal(socket.sent.at(-1).content.text, '🦜 | Conversa concluída.');
+  const own = (id, text) => ({ key: { id, remoteJid: '5511999999999@s.whatsapp.net', fromMe: true }, message: { conversation: text } });
+  socket.ev.emit('messages.upsert', { type: 'notify', messages: [own('typed', 'ArArA'), own('assistant', socket.sent.at(-1).content.text)] });
+  await tick();
+  assert.deepEqual(f.events.filter(e => e.type === 'message').map(e => e.text), ['ArArA']);
+  const pollId = await f.adapter.command({ op: 'poll', title: 'Escolha', values: ['A', 'B'] });
+  socket.ev.emit('messages.update', [{ key: { id: pollId }, update: { pollUpdates: [{
+    pollUpdateMessageKey: { id: 'self-vote', remoteJid: '5511999999999@s.whatsapp.net', fromMe: true },
+    vote: { selectedOptions: ['A'] },
+  }] } }]);
+  await tick();
+  assert.deepEqual(f.events.filter(e => e.poll).map(e => e.poll), [{ id: pollId, option: 'A' }]);
 });
 test('poll votes require exact sender, known original, one option and unused message id', async t => {
   const f = setup(); t.after(f.adapter.close); const socket = f.sockets[0]; socket.ev.emit('connection.update', { connection: 'open' });

@@ -9,7 +9,8 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
   const debug = value => { if (process.env.ZAP_DEBUG === '1') console.log(`[zap-debug] ${value}`); };
   let epoch = 0;
   let socket, identity, timer, closed = false, ready = false, qr, retry = 0;
-  const polls = new Map(), seen = new Map();
+  const polls = new Map(), seen = new Map(), sentTexts = new Map();
+  const prefix = text => text.startsWith('🦜 | ') ? text : `🦜 | ${text}`;
   const remember = id => { if (!id || seen.has(id)) return false; seen.set(id, Date.now()); if (seen.size > 2000) seen.delete(seen.keys().next().value); return true; };
   const start = () => {
     if (closed) return;
@@ -28,7 +29,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
         if (code === DisconnectReason.loggedOut) {
           // Invalidate the revoked socket before awaiting storage; late events cannot restore it.
           const resetting = ++epoch;
-          cancel(timer); polls.clear(); seen.clear(); retry = 0;
+          cancel(timer); polls.clear(); seen.clear(); sentTexts.clear(); retry = 0;
           emit({ type: 'status', status: t(locale, 'loggedOut') });
           try {
             await auth.reset();
@@ -77,7 +78,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
           continue;
         }
         const text = content?.conversation || content?.extendedTextMessage?.text;
-        if (typeof text === 'string' && text.length <= 16000) emit({ type: 'message', id: m.key.id, text });
+        if (typeof text === 'string' && text.length <= 16000 && !(m.key.fromMe && text.startsWith('🦜 | '))) emit({ type: 'message', id: m.key.id, text });
       }
     });
     socket.ev.on('messages.update', async updates => {
@@ -96,16 +97,27 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       }
     });
   };
-  const close = () => { if (closed) return; closed = true; ready = false; qr = undefined; epoch++; cancel(timer); socket?.end(new Error(t(locale, 'stopped'))); };
+  const close = () => { if (closed) return; closed = true; ready = false; qr = undefined; epoch++; cancel(timer); sentTexts.clear(); socket?.end(new Error(t(locale, 'stopped'))); };
   start();
   return { close, snapshot: () => ({ ready, qr }), async command(m) {
     if (!ready) throw Error(t(locale, 'disconnected'));
     const current = epoch, target = socket;
     const destination = await identity.destination();
     if (closed || !ready || current !== epoch) throw Error(t(locale, 'disconnected'));
-    const result = await target.sendMessage(destination, m.op === 'send' ? { text: m.text } : { poll: { name: m.title, values: m.values, selectableCount: 1 } });
+    if (m.op === 'edit') {
+      const previous = sentTexts.get(m.messageId);
+      if (!previous || previous.destination !== destination || previous.socket !== target || !m.text.startsWith(previous.text)) throw Error('Mensagem anterior indisponível para edição.');
+      if (prefix(m.text).length > 3500) throw Error('Mensagem editada excede o limite.');
+      await target.sendMessage(destination, { text: prefix(m.text), edit: previous.key });
+      previous.text = m.text;
+      debug('outgoing-completed edit');
+      return null;
+    }
+    const content = m.op === 'send' ? { text: prefix(m.text) } : { poll: { name: prefix(m.title), values: m.values, selectableCount: 1 } };
+    const result = await target.sendMessage(destination, content);
     debug(`outgoing-completed ${m.op}`);
     if (m.op === 'poll') { polls.set(result.key.id, result); if (polls.size > 100) polls.delete(polls.keys().next().value); }
-    return m.op === 'poll' ? result.key.id : null;
+    if (m.op === 'send') { sentTexts.set(result.key.id, { key: result.key, text: m.text, destination, socket: target }); if (sentTexts.size > 100) sentTexts.delete(sentTexts.keys().next().value); }
+    return result.key.id;
   } };
 }
