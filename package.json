@@ -1,6 +1,6 @@
 {
   "name": "arara-zap",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Conexão WhatsApp privada para Arara Code",
   "type": "module",
   "license": "MIT",
