@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { WebSocket } from 'ws';
 import { createZapServer } from '../src/server.js';
 import { deriveKey, proof } from '../src/security.js';
@@ -20,7 +21,7 @@ async function setup(t) {
 }
 test('QR appears only after authentication and locale reaches the WhatsApp adapter', { timeout: 5000 }, async t => {
   const f = await setup(t), c = await f.connect({ locale: 'es-MX' });
-  assert.equal((await c.ready).type, 'ready'); assert.equal((await c.next()).type, 'qr'); assert.equal((await c.next()).status, 'Esperando WhatsApp');
+  assert.deepEqual(await c.ready, { type: 'ready', serverVersion: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version }); assert.equal((await c.next()).type, 'qr'); assert.equal((await c.next()).status, 'Esperando WhatsApp');
   assert.equal(f.events[0].locale, 'es'); assert.equal(f.events[0].allowed(), number);
   f.events[0].emit({ type: 'message', text: '!arara', id: 'message' }); assert.equal((await c.next()).text, '!arara');
   const result = c.next(); c.ws.send(JSON.stringify({ id: 'send', op: 'send', text: 'hello' })); assert.equal((await result).type, 'result');

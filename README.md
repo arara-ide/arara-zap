@@ -49,6 +49,8 @@ Após um push na `main`, o CI testa Linux, Windows e macOS com Node 22 e 24. Se 
 
 Ao iniciar, o arara-zap consulta a última release estável e atualiza somente se sua versão for maior que a instalada. Alterações locais impedem a substituição automática. A instalação anterior fica preservada em uma pasta de backup.
 
+No modo **Em servidor**, a IDE verifica a versão informada pelo serviço após autenticar. Se houver uma release estável mais recente, mostra uma notificação pedindo para atualizar o serviço no servidor, com **Ver atualização**. A conexão e o controle pelo WhatsApp continuam disponíveis. Serviços antigos sem informação de versão recebem uma orientação para atualizar; indisponibilidade do GitHub não impede o uso.
+
 ## Segurança e operação
 
 - Somente `/zap` aceita upgrade; HTTP comum retorna 404. WebSocket também precisa de autenticação; o transporte sozinho não garante segurança.
@@ -62,7 +64,7 @@ Ao iniciar, o arara-zap consulta a última release estável e atualiza somente s
 
 ## Protocolo v1
 
-Servidor envia `{type:"challenge",version:1,nonce}`. Cliente responde `{type:"auth",number,proof}`; proof é HMAC-SHA256 da string `arara-zap/v1:<nonce>:<number>`, com chave scrypt(senha, `arara-zap/v1`, 32). Após `{type:"ready"}`, aceita `{id,op:"send",text}`, `{id,op:"poll",title,values}` e `{id,op:"edit",messageId,text}`; retorna `{type:"result",id,result,error?}`. `send` retorna o ID da mensagem; `edit` só aceita ID de texto enviado ao destino autorizado pelo socket atual. Eventos: `qr`, `status`, `message` e votos como `message.poll={id,option}`. Nenhuma operação permite definir outro destinatário.
+Servidor envia `{type:"challenge",version:1,nonce}`. Cliente responde `{type:"auth",number,proof}`; proof é HMAC-SHA256 da string `arara-zap/v1:<nonce>:<number>`, com chave scrypt(senha, `arara-zap/v1`, 32). Após `{type:"ready",serverVersion:"X.Y.Z"}`, aceita `{id,op:"send",text}`, `{id,op:"poll",title,values}` e `{id,op:"edit",messageId,text}`; retorna `{type:"result",id,result,error?}`. `send` retorna o ID da mensagem; `edit` só aceita ID de texto enviado ao destino autorizado pelo socket atual. Eventos: `qr`, `status`, `message` e votos como `message.poll={id,option}`. Nenhuma operação permite definir outro destinatário.
 
 ```sh
 npm test
