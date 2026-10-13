@@ -7,6 +7,7 @@ import { deriveKey } from './security.js';
 import { authStore } from './auth-store.js';
 import { whatsapp } from './whatsapp.js';
 import { createZapServer } from './server.js';
+import { acquireProcessLock } from './process-lock.mjs';
 process.umask(0o077);
 const locale = language(process.env.ZAP_LANG || process.env.LC_ALL || process.env.LANG);
 const host = process.env.ZAP_HOST || '127.0.0.1';
@@ -15,7 +16,8 @@ const dir = process.env.ZAP_DATA_DIR || join(homedir(), '.arara-zap');
 await mkdir(dir, { recursive: true, mode: 0o700 }); await chmod(dir, 0o700);
 // Exclusive lock prevents two processes corrupting the same session.
 const lock = join(dir, 'process.lock');
-try { await writeFile(lock, String(process.pid), { flag: 'wx', mode: 0o600 }); } catch { console.error(t(locale, 'lock')); process.exit(1); }
+let releaseLock;
+try { releaseLock = acquireProcessLock(lock, t(locale, 'lock')); } catch (error) { console.error(error.message); process.exit(1); }
 let zap;
 try {
   let password = process.env.ZAP_PASSWORD;
@@ -33,7 +35,7 @@ try {
   if (local) await chmod(join(dir, 'connection.json'), 0o600);
   console.log(t(locale, 'listening', { host, port: address.port }));
   let stopping = false;
-  const stop = async () => { if (stopping) return; stopping = true; await zap.close(); await auth.flush().catch(() => console.error(t(locale, 'storage'))); await unlink(lock); if (local) await unlink(join(dir, 'connection.json')).catch(() => {}); process.exit(0); };
+  const stop = async () => { if (stopping) return; stopping = true; await zap.close(); await auth.flush().catch(() => console.error(t(locale, 'storage'))); if (local) await unlink(join(dir, 'connection.json')).catch(() => {}); releaseLock(); process.exit(0); };
   process.once('SIGINT', stop); process.once('SIGTERM', stop);
   process.on('message', message => { if (message?.type === 'stop') void stop(); });
-} catch (e) { await zap?.close(); await unlink(lock).catch(() => {}); console.error(e.message); process.exitCode = 1; }
+} catch (e) { await zap?.close(); releaseLock(); console.error(e.message); process.exitCode = 1; }

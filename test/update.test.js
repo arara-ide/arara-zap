@@ -102,7 +102,7 @@ test('real Git checkout and npm ci replace source, preserve env and start the ne
   const repository = join(root, 'origin'), directory = join(root, 'installed'), signal = AbortSignal.timeout(30000);
   await mkdir(repository); await runCommand('git', ['init', '--initial-branch=main', '--template=', repository], root, signal);
   await mkdir(join(repository, 'src'));
-  for (const name of ['run.js', 'i18n.mjs', 'update.mjs']) await copyFile(new URL(`../src/${name}`, import.meta.url), join(repository, 'src', name));
+  for (const name of ['run.js', 'i18n.mjs', 'update.mjs', 'process-lock.mjs']) await copyFile(new URL(`../src/${name}`, import.meta.url), join(repository, 'src', name));
   await writeFile(join(repository, '.gitignore'), '.env\nnode_modules/\n');
   const files = async version => {
     await writeFile(join(repository, 'package.json'), JSON.stringify({ name: 'arara-zap', version, type: 'module' }));
