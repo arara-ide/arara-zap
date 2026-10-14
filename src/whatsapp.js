@@ -3,6 +3,7 @@ import makeWASocket, { DisconnectReason, decryptPollVote, jidNormalizedUser, nor
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { whatsappIdentity } from './identity.js';
+import { imageMatches, MAX_IMAGE_BYTES } from './security.js';
 export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
   const makeSocket = deps.makeSocket || makeWASocket, toQR = deps.toQR || QRCode.toDataURL, aggregate = deps.aggregate || getAggregateVotesInPollMessage;
   const schedule = deps.schedule || setTimeout, cancel = deps.cancel || clearTimeout;
@@ -112,6 +113,13 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       previous.text = m.text;
       debug('outgoing-completed edit');
       return null;
+    }
+    if (m.op === 'image') {
+      const image = Buffer.from(m.data, 'base64');
+      if (image.length > MAX_IMAGE_BYTES || !imageMatches(image, m.mimeType)) throw Error('Imagem inválida.');
+      const sent = await target.sendMessage(destination, { image, mimetype: m.mimeType, caption: prefix(m.caption) });
+      debug('outgoing-completed image');
+      return sent.key.id;
     }
     const content = m.op === 'send' ? { text: prefix(m.text) } : { poll: { name: prefix(m.title), values: m.values, selectableCount: 1 } };
     const result = await target.sendMessage(destination, content);

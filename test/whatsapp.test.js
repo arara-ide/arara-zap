@@ -42,6 +42,12 @@ test('send and poll use only the authorized number and retain original poll for 
   assert.ok(socket.sent.every(({ content }) => (content.text || content.poll?.name).startsWith('🦜 | ')));
   await assert.rejects(f.adapter.command({ op: 'edit', messageId: id, text: 'unrelated' }), /indisponível/);
   await assert.rejects(f.adapter.command({ op: 'edit', messageId: sentId, text: 'changed old answer' }), /indisponível/);
+  const png = Buffer.from('89504e470d0a1a0a0000', 'hex');
+  await f.adapter.command({ op: 'image', data: png.toString('base64'), mimeType: 'image/png', caption: 'Tela' });
+  const image = socket.sent.at(-1);
+  assert.equal(image.jid, '5511999999999@s.whatsapp.net');
+  assert.deepEqual({ ...image.content, image: image.content.image.toString('hex') }, { image: png.toString('hex'), mimetype: 'image/png', caption: '🦜 | Tela' });
+  await assert.rejects(f.adapter.command({ op: 'image', data: Buffer.from('<svg onload=x>').toString('base64'), mimeType: 'image/png', caption: 'x' }), /inválida/);
 });
 test('self chat accepts typed messages and ignores prefixed assistant replies without looping', async t => {
   const f = setup(); t.after(f.adapter.close); const socket = f.sockets[0];

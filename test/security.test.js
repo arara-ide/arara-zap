@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
 import { createZapServer } from '../src/server.js';
-import { deriveKey, proof, verify, authorized, validateCommand } from '../src/security.js';
+import { deriveKey, proof, verify, authorized, validateCommand, imageMatches } from '../src/security.js';
 test('challenge binds number and nonce; malformed proofs fail closed', () => {
   const key = deriveKey('a'.repeat(32)), nonce = 'nonce', number = '5511999999999';
   assert.ok(verify(key, nonce, number, proof(key, nonce, number)));
@@ -18,6 +18,24 @@ test('challenge binds number and nonce; malformed proofs fail closed', () => {
   assert.throws(() => validateCommand({ id: 'id', op: 'edit', messageId: 'sent-id', text: 'x'.repeat(3501) }));
   assert.throws(() => validateCommand({ id: 'id', op: 'poll', title: 'menu', values: ['same', 'same'] }));
   assert.throws(() => validateCommand({ id: 'id', op: 'poll', title: 'x'.repeat(200), values: ['A', 'B'] }));
+  const png = Buffer.from('89504e470d0a1a0a00', 'hex');
+  assert.equal(validateCommand({ id: 'id', op: 'image', data: png.toString('base64'), mimeType: 'image/png', caption: 'print' }).op, 'image');
+  assert.throws(() => validateCommand({ id: 'id', op: 'image', data: png.toString('base64'), mimeType: 'image/svg+xml', caption: 'x' }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'image', data: 'not base64!', mimeType: 'image/png', caption: 'x' }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'image', data: png.toString('base64'), mimeType: 'image/png', caption: 'x'.repeat(1100) }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'image', data: 'A'.repeat(12 * 1024 * 1024), mimeType: 'image/png', caption: 'x' }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'image', data: png.toString('base64'), mimeType: 'image/png', caption: 'x', number: 'other' }));
+  assert.ok(imageMatches(png, 'image/png'));
+  assert.equal(imageMatches(png, 'image/jpeg'), false);
+  assert.equal(imageMatches(Buffer.from('<svg/>'), 'image/png'), false);
+});
+test('large frames are refused before authentication', async t => {
+  const server = createZapServer({ key: deriveKey('c'.repeat(32)), port: 0, number: '5511999999999', adapterFactory: () => ({ snapshot: () => ({}), close() {}, command: async () => null }) });
+  const address = await server.listen(); t.after(() => server.close());
+  const ws = new WebSocket(`ws://127.0.0.1:${address.port}/zap`); await next(ws);
+  const closed = new Promise(resolve => ws.once('close', code => resolve(code)));
+  ws.send(JSON.stringify({ type: 'auth', pad: 'x'.repeat(40000) }));
+  assert.equal(await closed, 1008);
 });
 const next = ws => new Promise((resolve, reject) => { ws.once('message', raw => resolve(JSON.parse(raw))); ws.once('error', reject); });
 test('WebSocket authenticates before exposing QR or messages, limits destination and rejects wrong credentials', async t => {

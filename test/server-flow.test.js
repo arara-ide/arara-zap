@@ -21,10 +21,12 @@ async function setup(t) {
 }
 test('QR appears only after authentication and locale reaches the WhatsApp adapter', { timeout: 5000 }, async t => {
   const f = await setup(t), c = await f.connect({ locale: 'es-MX' });
-  assert.deepEqual(await c.ready, { type: 'ready', serverVersion: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version }); assert.equal((await c.next()).type, 'qr'); assert.equal((await c.next()).status, 'Esperando WhatsApp');
+  assert.deepEqual(await c.ready, { type: 'ready', serverVersion: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version, features: ['image'] }); assert.equal((await c.next()).type, 'qr'); assert.equal((await c.next()).status, 'Esperando WhatsApp');
   assert.equal(f.events[0].locale, 'es'); assert.equal(f.events[0].allowed(), number);
   f.events[0].emit({ type: 'message', text: '!arara', id: 'message' }); assert.equal((await c.next()).text, '!arara');
   const result = c.next(); c.ws.send(JSON.stringify({ id: 'send', op: 'send', text: 'hello' })); assert.equal((await result).type, 'result');
+  // Imagem grande (acima do limite antigo de 32 KB) passa depois da autenticação.
+  const image = c.next(); c.ws.send(JSON.stringify({ id: 'image', op: 'image', mimeType: 'image/png', caption: 'print', data: Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(200000)]).toString('base64') })); assert.equal((await image).type, 'result');
   // Client and server close events can arrive in either order across platforms.
   const closed = once(c.ws, 'close'); c.ws.close(); await closed; await f.events[0].closed; assert.equal(f.closed.length, 1);
 });
@@ -47,5 +49,5 @@ test('second IDE is rejected and oversized or arbitrary recipient payloads are r
   const f = await setup(t), c = await f.connect(); await c.ready;
   const second = new WebSocket(f.url); await once(second, 'error');
   const closed = once(c.ws, 'close'); c.ws.send(JSON.stringify({ id: 'one', op: 'send', number: '5511888888888', text: 'hello' })); const [code] = await closed; await f.events[0].closed; assert.equal(code, 1008); assert.equal(f.calls.length, 0);
-  const large = await f.connect(); await large.ready; const tooLarge = once(large.ws, 'close'); large.ws.send('x'.repeat(40000)); assert.equal((await tooLarge)[0], 1009);
+  const large = await f.connect(); await large.ready; const tooLarge = once(large.ws, 'close'); large.ws.send('x'.repeat(12 * 1024 * 1024 + 1)); assert.equal((await tooLarge)[0], 1009);
 });
