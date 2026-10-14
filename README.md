@@ -4,6 +4,18 @@ Conecta o WhatsApp ao Arara Code diretamente por WebSocket. Node simples, sem AP
 
 Base de conexão: [Baileys](https://github.com/WhiskeySockets/Baileys), também usado no wa-dialogue. Implementação independente, licença MIT. Integração não oficial do WhatsApp; compatibilidade depende do serviço e do Baileys.
 
+## Integração não oficial e responsabilidade pelo uso
+
+O Arara Zap e a integração WhatsApp do Arara Code são projetos independentes, sem afiliação, associação, autorização, patrocínio ou endosso do WhatsApp ou da Meta. A conexão via Baileys usa o WhatsApp Web; não é a API oficial WhatsApp Business Platform. WhatsApp, Meta e demais marcas pertencem aos respectivos titulares.
+
+O uso é por sua conta e risco. Cabe a cada usuário avaliar a adequação da integração, cumprir os termos do WhatsApp, a legislação aplicável e os direitos de terceiros, obter as autorizações necessárias e responder pelas mensagens, dados, comandos e ações executados com sua conta. Os mantenedores não incentivam nem autorizam spam, assédio, vigilância sem consentimento, disparos abusivos ou outras violações desses termos e direitos.
+
+O software é fornecido no estado em que se encontra, sem garantias de funcionamento, disponibilidade, compatibilidade ou continuidade. Mudanças no WhatsApp podem interromper a integração; o uso pode resultar em restrições, suspensão ou banimento da conta. Não há garantia de recuperação da conta, de mensagens ou de dados.
+
+Na máxima extensão permitida pela legislação aplicável e observada a licença de cada componente, autores, contribuidores e mantenedores não assumem responsabilidade por uso indevido, bloqueios de contas, perda de dados, danos diretos ou indiretos, prejuízos ou reclamações decorrentes do uso ou da impossibilidade de uso da integração. Este aviso não exclui responsabilidades que não possam ser afastadas por lei.
+
+Referências de abordagem: [aviso do Baileys](https://github.com/WhiskeySockets/Baileys/blob/master/.github/README.md#disclaimer), [integrações da Evolution API](https://github.com/evolution-foundation/evolution-api#connection-types) e [cláusulas 7 e 8 da licença da Evolution API](https://github.com/evolution-foundation/evolution-api/blob/main/LICENSE). Essas referências não implicam vínculo com esses projetos nem alteram as licenças do Arara.
+
 ## Node — Windows, Linux e macOS
 
 Instale Node 22.16 ou superior e Git. No PowerShell (Windows) ou terminal (Linux/macOS):
