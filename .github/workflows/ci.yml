@@ -1,8 +1,7 @@
 name: Test
 on:
   push:
-    branches: [main, development, 'release/**', 'hotfix/**']
-  pull_request:
+    branches: [main]
 permissions:
   contents: read
 concurrency:
@@ -10,6 +9,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   test:
+    if: github.ref == 'refs/heads/main'
     strategy:
       fail-fast: false
       matrix:
@@ -26,8 +26,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
-  # Garante que a imagem continua construindo a cada PR/push (sem publicar).
+  # Garante que a imagem continua construindo a cada push na main (sem publicar).
   docker-build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -79,7 +80,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
   docker:
     needs: release
-    if: needs.release.outputs.tag != ''
+    if: github.ref == 'refs/heads/main' && needs.release.outputs.tag != ''
     permissions:
       contents: read
       packages: write
