@@ -62,16 +62,10 @@ jobs:
           tag="v${current_version}"
           target_sha="$GITHUB_SHA"
 
-          # Se a tag já existe no repositório, faz bump de patch automaticamente e commita
+          # Versões publicadas são imutáveis; prepare a próxima versão por PR.
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "Tag $tag já existe. Incrementando patch version automaticamente..."
-            npm version patch --no-git-tag-version
-            new_version=$(node -p "require('./package.json').version")
-            tag="v${new_version}"
-            git add package.json package-lock.json
-            git commit -m "chore: bump version to ${tag} [skip ci]"
-            git push origin HEAD:main
-            target_sha=$(git rev-parse HEAD)
+            echo "Tag $tag já existe. Para uma nova release, incremente a versão por PR."
+            exit 0
           fi
 
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
