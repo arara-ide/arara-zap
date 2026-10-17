@@ -29,7 +29,8 @@ test('PID reuse is detected through Linux boot and process start identity', { sk
 test('cleanup never removes a replacement lock and filesystem errors are preserved', t => {
   const path = fixture(t), release = acquireProcessLock(path);
   writeFileSync(path, String(process.pid)); release(); assert.equal(readFileSync(path, 'utf8'), String(process.pid));
-  assert.throws(() => acquireProcessLock(join(path, 'invalid')), { code: 'ENOTDIR' });
+  // Windows reports a path below a regular file as ENOENT; POSIX reports ENOTDIR.
+  assert.throws(() => acquireProcessLock(join(path, 'invalid')), { code: process.platform === 'win32' ? 'ENOENT' : 'ENOTDIR' });
 });
 
 test('a legacy empty lock is recovered only after its write grace period', t => {
