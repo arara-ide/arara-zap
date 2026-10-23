@@ -1,8 +1,8 @@
 name: Test
 on:
   push:
-    branches: [main]
-  pull_request:
+    branches: [main, development]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   test:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     strategy:
       fail-fast: false
       matrix:
@@ -26,13 +27,49 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
-  # Garante que a imagem continua construindo a cada PR/push (sem publicar).
+  # Valida a imagem nas duas branches; development pode ser baixada como artifact.
   docker-build:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: docker build -t arara-zap:ci .
+      - name: Exportar imagem de development
+        if: github.ref == 'refs/heads/development'
+        run: |
+          mkdir -p dist
+          docker save arara-zap:ci | gzip > dist/arara-zap-development-docker.tar.gz
+          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/development'
+        with:
+          name: arara-zap-development-docker
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  development-package:
+    needs: [test, docker-build]
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Empacotar código de development
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz --prefix=arara-zap/ --output=dist/arara-zap-development.tar.gz HEAD
+          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arara-zap-development
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     needs: [test, docker-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -61,16 +98,10 @@ jobs:
           tag="v${current_version}"
           target_sha="$GITHUB_SHA"
 
-          # Se a tag já existe no repositório, faz bump de patch automaticamente e commita
+          # Versões publicadas são imutáveis; prepare a próxima versão por PR.
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "Tag $tag já existe. Incrementando patch version automaticamente..."
-            npm version patch --no-git-tag-version
-            new_version=$(node -p "require('./package.json').version")
-            tag="v${new_version}"
-            git add package.json package-lock.json
-            git commit -m "chore: bump version to ${tag} [skip ci]"
-            git push origin HEAD:main
-            target_sha=$(git rev-parse HEAD)
+            echo "Tag $tag já existe. Para uma nova release, incremente a versão por PR."
+            exit 0
           fi
 
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -79,7 +110,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
   docker:
     needs: release
-    if: needs.release.outputs.tag != ''
+    if: github.ref == 'refs/heads/main' && needs.release.outputs.tag != ''
     permissions:
       contents: read
       packages: write

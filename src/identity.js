@@ -15,7 +15,26 @@ export function whatsappIdentity(socket, number) {
     const account = jidNormalizedUser(socket.user?.id || '');
     return account.endsWith('@s.whatsapp.net') && account === await destination();
   };
-  return { destination, selfChat, async accepts(key) {
+  const resolveSender = async (primary, alternative) => {
+    let sender = jidNormalizedUser(primary || '');
+    if (sender.endsWith('@lid')) {
+      const alt = jidNormalizedUser(alternative || '');
+      sender = alt.endsWith('@s.whatsapp.net') ? alt : jidNormalizedUser(await socket.signalRepository?.lidMapping?.getPNForLID(sender) || '');
+    }
+    return sender.endsWith('@s.whatsapp.net') ? sender : '';
+  };
+  const isAuthorized = async sender => {
+    if (!sender) return false;
+    if (sender === configured) return true;
+    try { return sender === await destination(); } catch { return false; }
+  };
+  /** Group messages count only in a group this session created, and only from the authorized number. */
+  const acceptsGroup = async (key, groups) => {
+    const group = key.remoteJid || '';
+    if (!group.endsWith('@g.us') || !groups.has(group) || key.fromMe) return false;
+    return isAuthorized(await resolveSender(key.participant, key.participantAlt));
+  };
+  return { destination, selfChat, acceptsGroup, async accepts(key) {
     if (key.fromMe && !await selfChat().catch(() => false)) return false;
     const primary = jidNormalizedUser(key.remoteJid || '');
     if (!primary.endsWith('@s.whatsapp.net') && !primary.endsWith('@lid')) return false;

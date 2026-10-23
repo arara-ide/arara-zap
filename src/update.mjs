@@ -22,10 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 import { execFile } from 'node:child_process';
-import { lstat, readFile, writeFile, mkdtemp, rename, rm, copyFile, mkdir } from 'node:fs/promises';
+import { lstat, readFile, mkdtemp, rename, rm, copyFile, mkdir } from 'node:fs/promises';
 import { join, dirname, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import { t } from './i18n.mjs';
+import { acquireProcessLock, isProcessLocked } from './process-lock.mjs';
 export const SOURCE = 'https://github.com/arara-ide/arara-zap.git';
 export const RELEASE_URL = 'https://api.github.com/repos/arara-ide/arara-zap/releases/latest';
 function version(value) { const match = /^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(value); return match && match.slice(1).map(Number); }
@@ -65,8 +66,7 @@ export async function updateInstallation({ directory, locale = 'en', signal, fet
   const current = await installation(directory);
   if (!current) throw Error(t(locale, 'invalid'));
   // Check before network or mutation. The service must not update files under a live process.
-  try { const pid = Number(await readFile(join(dataDirectory, 'process.lock'), 'utf8')); if (!Number.isInteger(pid) || pid <= 0) throw Error(t(locale, 'busy')); try { process.kill(pid, 0); throw Error(t(locale, 'busy')); } catch (e) { if (e.code !== 'ESRCH') throw e; } }
-  catch (e) { if (e.code !== 'ENOENT') throw e; }
+  if (isProcessLocked(join(dataDirectory, 'process.lock'))) throw Error(t(locale, 'busy'));
   report(t(locale, 'checking'));
   let latest;
   try { latest = await latestRelease({ fetchImpl, signal }); }
@@ -78,8 +78,7 @@ export async function updateInstallation({ directory, locale = 'en', signal, fet
   // Never overwrite hand-edited source, or a repository belonging to someone else.
   if (![SOURCE, 'git@github.com:arara-ide/arara-zap.git'].includes(source) || dirty) { report(t(locale, 'dirty')); return { updated: false, version: current.version, reason: 'dirty' }; }
   const lock = `${directory}.update-lock`;
-  try { await writeFile(lock, String(process.pid), { flag: 'wx', mode: 0o600 }); }
-  catch { throw Error(t(locale, 'busy')); }
+  const releaseLock = acquireProcessLock(lock, t(locale, 'busy'));
   let staging, backup;
   try {
     staging = await mkdtemp(join(dirname(directory), '.arara-zap-update-'));
@@ -117,5 +116,5 @@ export async function updateInstallation({ directory, locale = 'en', signal, fet
     report(t(locale, 'updated', latest));
     return { updated: true, version: latest.version, backup };
   } catch (e) { throw Error(t(locale, signal.aborted ? 'cancelled' : 'failed'), { cause: e }); }
-  finally { if (staging) await rm(staging, { recursive: true, force: true }); await rm(lock, { force: true }); }
+  finally { if (staging) await rm(staging, { recursive: true, force: true }); releaseLock(); }
 }

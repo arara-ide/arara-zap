@@ -4,12 +4,15 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 import { verify, validateCommand } from './security.js';
+/** Antes do login só cabem mensagens pequenas; imagens (base64) só depois de autenticar. */
+const MAX_UNAUTHENTICATED = 32768;
+const MAX_MESSAGE = 12 * 1024 * 1024;
 const serverVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-export function createZapServer({ key, locale = 'en', host = '127.0.0.1', port = 7310, number, adapterFactory }) {
+export function createZapServer({ key, locale = 'en', host = '127.0.0.1', port = 7310, number, extraNumbers = [], adapterFactory }) {
   let owner, allowed = number, adapter;
   const server = createServer((req, res) => { res.writeHead(404); res.end(); });
   server.maxConnections = 32; server.maxHeadersCount = 32; server.headersTimeout = 5000; server.requestTimeout = 5000; server.keepAliveTimeout = 1000;
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 32768, perMessageDeflate: false });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE, perMessageDeflate: false });
   let windowStart = Date.now(), attempts = 0;
   server.on('upgrade', (req, socket, head) => {
     if (Date.now() - windowStart > 60000) { attempts = 0; windowStart = Date.now(); }
@@ -27,15 +30,17 @@ export function createZapServer({ key, locale = 'en', host = '127.0.0.1', port =
     ws.on('message', async (raw, binary) => {
       try {
         if (binary) throw Error('Binary unsupported');
+        if (!authenticated && raw.length > MAX_UNAUTHENTICATED) throw Error('Too large');
         const m = JSON.parse(raw.toString());
         if (!authenticated) {
           if (m.type !== 'auth' || !/^\d{10,15}$/.test(m.number) || (number && number !== m.number) || !verify(key, nonce, m.number, m.proof) || owner) { ws.close(1008, t(locale, 'authFailed')); return; }
           clientLocale = language(m.locale || locale);
-          authenticated = true; clearTimeout(timeout); owner = ws; allowed = m.number;
-          send(ws, { type: 'ready', serverVersion });
+          authenticated = true; clearTimeout(timeout); owner = ws; allowed = extraNumbers.length ? [m.number, ...extraNumbers.filter(n => n !== m.number)] : m.number;
+          send(ws, { type: 'ready', serverVersion, features: ['image', 'account', 'logout', 'group', 'adopt'] });
           adapter ||= adapterFactory(value => { if (owner) send(owner, value); }, () => allowed, clientLocale);
           const snapshot = adapter.snapshot();
           if (snapshot.qr) send(ws, { type: 'qr', qr: snapshot.qr });
+          if (snapshot.account) send(ws, { type: 'account', number: snapshot.account });
           send(ws, { type: 'status', status: t(clientLocale, snapshot.ready ? 'connected' : 'waiting') });
           return;
         }
