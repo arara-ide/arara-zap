@@ -1,3 +1,13 @@
+## Internacionalização e localização — obrigatório
+
+- Toda interface deve oferecer português (`pt-BR`/`pt`), inglês (`en`) e espanhol (`es`), com mensagens em arquivos de tradução estruturados. Toda alteração futura em texto visível exige atualizar os três catálogos na mesma mudança, inclusive títulos, comandos, configurações, validações, notificações, estados vazios e nomes acessíveis.
+- Não misture idiomas, concatene fragmentos traduzidos nem traduza identificadores, comandos, caminhos, marcas, conteúdo do usuário ou contratos de ferramentas. Use mensagens completas com parâmetros; preserve os mesmos parâmetros e chaves nos três idiomas e trate plurais quando necessário.
+- Datas, horas, números, percentuais e moedas seguem o locale efetivo com `Intl`; moeda, fuso e valores dos dados não mudam com o idioma. Não fixe `pt-BR` em formatadores da interface.
+- Verifique paridade de chaves/parâmetros, fallback e variantes regionais, além dos testes/builds pertinentes. Catálogo incompleto ou texto ainda fixo deve ser informado como pendência, nunca declarado traduzido.
+- Serviço independente: mantenha resolução regional de `ZAP_LANG` e locale por conexão recebido da IDE, com fallback em inglês. Use catálogos estruturados versionados para mensagens de operação/atualização. Preserve protocolo, autenticação e isolamento entre conexões; o idioma de um cliente não muda o de outro.
+
+- Catálogos e validação: `src/locales/{en,pt,es}.json`; use `src/i18n.mjs` por conexão e preserve a cópia do runtime embarcado no Arara AI (`src/remote/runtime/`). Valide com `npm test && npm run build`.
+
 # AGENTS.md — Arara Zap
 
 ## Fluxo de branches

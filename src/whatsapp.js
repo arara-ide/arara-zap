@@ -125,7 +125,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       return null;
     }
     const chosen = m.op === 'send' && m.to ? identities.find(x => x.number === m.to) : undefined;
-    if (m.op === 'send' && m.to && !chosen) throw Error('Número não autorizado.');
+    if (m.op === 'send' && m.to && !chosen) throw Error(t(locale, 'unauthorizedNumber'));
     const destination = await (chosen?.identity ?? identity).destination();
     if (closed || !ready || current !== epoch) throw Error(t(locale, 'disconnected'));
     if (m.op === 'group') {
@@ -133,7 +133,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       const owners = await Promise.all(identities.slice(1).map(x => x.identity.destination().catch(() => undefined)));
       const members = [...new Set([destination, ...owners.filter(Boolean), ...m.participants.map(p => `${p}@s.whatsapp.net`)])];
       const created = await target.groupCreate(prefix(m.subject).slice(0, 100), members);
-      if (!created?.id || !created.id.endsWith('@g.us')) throw Error('Grupo não criado.');
+      if (!created?.id || !created.id.endsWith('@g.us')) throw Error(t(locale, 'groupNotCreated'));
       await groups.add(created.id);
       return created.id;
     }
@@ -141,7 +141,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       // Another bot's session created the group with this account in it; confirm membership before trusting it.
       const meta = await target.groupMetadata(m.group);
       const self = jidNormalizedUser(target.user?.id || '');
-      if (!meta?.participants?.some(p => jidNormalizedUser(p.id || p.jid || '') === self || jidNormalizedUser(p.phoneNumber || '') === self)) throw Error('Esta conta não está no grupo.');
+      if (!meta?.participants?.some(p => jidNormalizedUser(p.id || p.jid || '') === self || jidNormalizedUser(p.phoneNumber || '') === self)) throw Error(t(locale, 'notMember'));
       await groups.add(m.group);
       return m.group;
     }
@@ -152,7 +152,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
     }
     if (m.op === 'edit') {
       const previous = sentTexts.get(m.messageId);
-      if (!previous || previous.destination !== destination || previous.socket !== target || !m.text.startsWith(previous.text)) throw Error('Mensagem anterior indisponível para edição.');
+      if (!previous || previous.destination !== destination || previous.socket !== target || !m.text.startsWith(previous.text)) throw Error(t(locale, 'messageUnavailable'));
       if (prefix(m.text).length > 3500) throw Error('Mensagem editada excede o limite.');
       await target.sendMessage(destination, { text: prefix(m.text), edit: previous.key });
       previous.text = m.text;
@@ -161,7 +161,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
     }
     if (m.op === 'image') {
       const image = Buffer.from(m.data, 'base64');
-      if (image.length > MAX_IMAGE_BYTES || !imageMatches(image, m.mimeType)) throw Error('Imagem inválida.');
+      if (image.length > MAX_IMAGE_BYTES || !imageMatches(image, m.mimeType)) throw Error(t(locale, 'invalidImage'));
       const sent = await target.sendMessage(destination, { image, mimetype: m.mimeType, caption: prefix(m.caption) });
       debug('outgoing-completed image');
       return sent.key.id;

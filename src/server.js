@@ -45,12 +45,12 @@ export function createZapServer({ key, locale = 'en', host = '127.0.0.1', port =
           return;
         }
         if (Date.now() - since > 60000) { since = Date.now(); count = 0; }
-        if (++count > 120 || processing) { ws.close(1008, t(locale, 'limit')); return; }
+        if (++count > 120 || processing) { ws.close(1008, t(clientLocale, 'limit')); return; }
         validateCommand(m); processing = true;
         try { const result = await adapter.command(m); send(ws, { type: 'result', id: m.id, result }); }
         catch { send(ws, { type: 'result', id: m.id, error: t(clientLocale, 'sendFailed') }); }
         finally { processing = false; }
-      } catch { ws.close(1008, t(locale, 'invalidRequest')); }
+      } catch { ws.close(1008, t(clientLocale, 'invalidRequest')); }
     });
     ws.on('error', () => {});
     ws.on('close', () => { clearTimeout(timeout); if (owner === ws) { owner = undefined; adapter?.close(); adapter = undefined; } });

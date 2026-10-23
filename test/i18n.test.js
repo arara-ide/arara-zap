@@ -11,3 +11,13 @@ test('all runtime/update messages exist in English, Portuguese and Spanish', () 
   assert.equal(t('de', 'connected'), 'WhatsApp connected');
   assert.equal(t('es', 'updated', { version: '0.2.0' }), 'Actualizado a 0.2.0.');
 });
+test('JSON catalogs have the same keys and interpolation parameters without relying on fallback', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const catalogs = await Promise.all(['en', 'pt', 'es'].map(async locale => JSON.parse(await readFile(new URL(`../src/locales/${locale}.json`, import.meta.url), 'utf8'))));
+  const params = text => [...text.matchAll(/\{\w+\}/g)].map(match => match[0]).sort();
+  for (const catalog of catalogs) {
+    assert.deepEqual(Object.keys(catalog).sort(), Object.keys(catalogs[0]).sort());
+    for (const [key, text] of Object.entries(catalogs[0])) assert.deepEqual(params(catalog[key]), params(text), key);
+  }
+  assert.equal(t('en', 'updated', { version: '$& {host}' }), 'Updated to $& {host}.');
+});
