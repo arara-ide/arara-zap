@@ -1,0 +1,73 @@
+name: Test
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['22', '24']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run build
+  release:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: arara-zap-release
+      cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.publish.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Publish version from package.json
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(node --input-type=module -e '
+            import fs from "node:fs";
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(pkg.version) ||
+                lock.version !== pkg.version || lock.packages[""].version !== pkg.version) {
+              throw Error("Invalid or mismatched release version");
+            }
+            console.log(`v${pkg.version}`);
+          ')
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            git fetch --no-tags origin "refs/tags/$tag"
+            if [ "$(git rev-parse 'FETCH_HEAD^{commit}')" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag $tag already belongs to another commit. Bump package.json and package-lock.json before releasing."
+              exit 1
+            fi
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then exit "$status"; fi
+          fi
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$tag" --generate-notes --latest
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+  docker:
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
