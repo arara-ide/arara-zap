@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { WebSocket } from 'ws';
+import { createZapServer } from '../src/server.js';
+import { deriveKey, proof, verify, authorized, validateCommand } from '../src/security.js';
+test('challenge binds number and nonce; malformed proofs fail closed', () => {
+  const key = deriveKey('a'.repeat(32)), nonce = 'nonce', number = '5511999999999';
+  assert.ok(verify(key, nonce, number, proof(key, nonce, number)));
+  assert.equal(verify(key, 'replay', number, proof(key, nonce, number)), false);
+  assert.equal(verify(key, nonce, '5511888888888', proof(key, nonce, number)), false);
+  for (const value of [null, '', 'x'.repeat(64)]) assert.equal(verify(key, nonce, number, value), false);
+  assert.ok(authorized(`${number}@s.whatsapp.net`, number));
+  for (const jid of [`${number}@g.us`, `${number}@s.whatsapp.net.extra`, '123@lid']) assert.equal(authorized(jid, number), false);
+  assert.throws(() => validateCommand({ id: 'id', op: 'send', text: 'x'.repeat(3501) }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'send', text: 'x'.repeat(3496) }));
+  assert.deepEqual(validateCommand({ id: 'id', op: 'edit', messageId: 'sent-id', text: 'updated' }).op, 'edit');
+  assert.throws(() => validateCommand({ id: 'id', op: 'edit', messageId: '../../other', text: 'updated' }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'edit', messageId: 'sent-id', text: 'x'.repeat(3501) }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'poll', title: 'menu', values: ['same', 'same'] }));
+  assert.throws(() => validateCommand({ id: 'id', op: 'poll', title: 'x'.repeat(200), values: ['A', 'B'] }));
+});
+const next = ws => new Promise((resolve, reject) => { ws.once('message', raw => resolve(JSON.parse(raw))); ws.once('error', reject); });
+test('WebSocket authenticates before exposing QR or messages, limits destination and rejects wrong credentials', async t => {
+  const key = deriveKey('b'.repeat(32)); let starts = 0, commands = [];
+  const server = createZapServer({ key, port: 0, number: '5511999999999', adapterFactory: () => { starts++; return { snapshot: () => ({ ready: true }), close() {}, command: async m => { commands.push(m); return 'poll-id'; } }; } });
+  const address = await server.listen(); t.after(() => server.close());
+  const bad = new WebSocket(`ws://127.0.0.1:${address.port}/zap`); const challenge = await next(bad);
+  assert.equal(starts, 0); assert.equal(challenge.type, 'challenge');
+  const closed = new Promise(resolve => bad.once('close', resolve)); bad.send(JSON.stringify({ type: 'auth', number: '5511999999999', proof: '0'.repeat(64) })); await closed; assert.equal(starts, 0);
+  const ws = new WebSocket(`ws://127.0.0.1:${address.port}/zap`); t.after(() => ws.terminate()); const c = await next(ws);
+  const ready = next(ws); ws.send(JSON.stringify({ type: 'auth', number: '5511999999999', proof: proof(key, c.nonce, '5511999999999') })); assert.equal((await ready).type, 'ready');
+  const response = next(ws); ws.send(JSON.stringify({ id: 'one', op: 'poll', title: 'Menu', values: ['A', 'B'] })); assert.equal((await response).result, 'poll-id'); assert.equal(commands.length, 1);
+  const edited = next(ws); ws.send(JSON.stringify({ id: 'edit', op: 'edit', messageId: 'sent-id', text: '🦜 | resposta\n\nPedido encerrado.' }));
+  assert.equal((await edited).result, 'poll-id'); assert.deepEqual(commands[1], { id: 'edit', op: 'edit', messageId: 'sent-id', text: '🦜 | resposta\n\nPedido encerrado.' });
+  const rejected = new Promise(resolve => ws.once('close', resolve)); ws.send(JSON.stringify({ id: 'two', op: 'execute', command: 'id' })); await rejected;
+});
