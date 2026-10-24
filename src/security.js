@@ -5,11 +5,9 @@ export function verify(key, nonce, number, value) {
   return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) && timingSafeEqual(Buffer.from(proof(key, nonce, number), 'hex'), Buffer.from(value, 'hex'));
 }
 export function authorized(jid, number) { return jid === `${number}@s.whatsapp.net`; }
-/** Imagens da ferramenta show_image do Arara Code: até 8 MB (base64 ocupa 4/3). */
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_BASE64 = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-/** Tipo pelos bytes; o declarado precisa bater (nada de arquivo arbitrário com rótulo de imagem). */
 export function imageMatches(buf, mimeType) {
   const at = (i, ...b) => b.every((v, j) => buf[i + j] === v);
   const real = at(0, 0x89, 0x50, 0x4e, 0x47) ? 'image/png' : at(0, 0xff, 0xd8, 0xff) ? 'image/jpeg' : at(0, 0x47, 0x49, 0x46, 0x38) ? 'image/gif' : at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50) ? 'image/webp' : '';

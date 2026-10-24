@@ -15,7 +15,6 @@ const host = process.env.ZAP_HOST || '127.0.0.1';
 const local = ['127.0.0.1', '::1'].includes(host);
 const dir = process.env.ZAP_DATA_DIR || join(homedir(), '.arara-zap');
 await mkdir(dir, { recursive: true, mode: 0o700 }); await chmod(dir, 0o700);
-// Exclusive lock prevents two processes corrupting the same session.
 const lock = join(dir, 'process.lock');
 let releaseLock;
 try { releaseLock = acquireProcessLock(lock, t(locale, 'lock')); } catch (error) { console.error(error.message); process.exit(1); }

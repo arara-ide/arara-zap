@@ -1,7 +1,6 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { GROUP_JID } from './security.js';
 
-/** Groups this session created. Only these are read or written to; at most 50 are kept. */
 export async function groupStore(path) {
   let ids = [];
   try {

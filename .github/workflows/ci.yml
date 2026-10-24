@@ -27,7 +27,6 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
-  # Valida a imagem nas duas branches; development pode ser baixada como artifact.
   docker-build:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
@@ -98,7 +97,6 @@ jobs:
           tag="v${current_version}"
           target_sha="$GITHUB_SHA"
 
-          # Versões publicadas são imutáveis; prepare a próxima versão por PR.
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
             echo "Tag $tag já existe. Para uma nova release, incremente a versão por PR."
             exit 0

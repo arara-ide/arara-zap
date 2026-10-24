@@ -1,6 +1,5 @@
 import { jidNormalizedUser } from '@whiskeysockets/baileys';
 
-// Resolve only the configured number through WhatsApp. Never guess phone-number aliases.
 export function whatsappIdentity(socket, number) {
   const configured = `${number}@s.whatsapp.net`;
   let lookup;
@@ -28,7 +27,6 @@ export function whatsappIdentity(socket, number) {
     if (sender === configured) return true;
     try { return sender === await destination(); } catch { return false; }
   };
-  /** Group messages count only in a group this session created, and only from the authorized number. */
   const acceptsGroup = async (key, groups) => {
     const group = key.remoteJid || '';
     if (!group.endsWith('@g.us') || !groups.has(group) || key.fromMe) return false;
