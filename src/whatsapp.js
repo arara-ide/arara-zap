@@ -11,7 +11,6 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
   let epoch = 0;
   let socket, identity, identities = [], timer, closed = false, ready = false, qr, retry = 0, account;
   const polls = new Map(), seen = new Map(), sentTexts = new Map();
-  /** Groups this session created (persisted by the caller); the only groups it reads or writes. */
   const groups = deps.groups || (() => { const set = new Set(); return { has: id => set.has(id), add: async id => { set.add(id); } }; })();
   const accountNumber = () => { const jid = jidNormalizedUser(socket?.user?.id || ''); const n = jid.endsWith('@s.whatsapp.net') ? jid.split('@')[0] : ''; return /^\d{6,20}$/.test(n) ? n : undefined; };
   const prefix = text => text.startsWith('🦜 | ') ? text : `🦜 | ${text}`;
@@ -34,7 +33,6 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
         ready = false; qr = undefined; account = undefined; emit({ type: 'qr', qr: null });
         const code = update.lastDisconnect?.error?.output?.statusCode;
         if (code === DisconnectReason.loggedOut) {
-          // Invalidate the revoked socket before awaiting storage; late events cannot restore it.
           const resetting = ++epoch;
           cancel(timer); polls.clear(); seen.clear(); sentTexts.clear(); retry = 0;
           emit({ type: 'status', status: t(locale, 'loggedOut') });
@@ -70,16 +68,13 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
         if (poll) {
           const original = polls.get(poll.pollCreationMessageKey?.id);
           if (!original || !poll.vote || !original.message?.messageContextInfo?.messageSecret) { debug('poll-vote unavailable-original'); continue; }
-          // Baileys 7 delivers encrypted votes as upserts, without emitting pollUpdates.
-          // PN and LID are distinct cryptographic identities; use only this account and
-          // the already-authorized sender, and require authenticated decryption.
           const creators = [...new Set([currentSocket.user?.id, currentSocket.user?.lid, auth.state.creds?.me?.id, auth.state.creds?.me?.lid].filter(Boolean).map(jidNormalizedUser))];
           const voters = [...new Set([m.key.remoteJid, m.key.remoteJidAlt].filter(Boolean).map(jidNormalizedUser))];
           let vote;
           for (const pollCreatorJid of creators) {
             for (const voterJid of voters) {
               try { vote = decryptPollVote(poll.vote, { pollCreatorJid, voterJid, pollMsgId: original.key.id, pollEncKey: original.message.messageContextInfo.messageSecret }); break; }
-              catch { /* Try the other authenticated address representation. */ }
+              catch {}
             }
             if (vote) break;
           }
@@ -102,14 +97,13 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       for (const { key, update } of updates) {
         const original = polls.get(key.id);
         if (!original || !update.pollUpdates || closed || current !== epoch) continue;
-        // Decryption uses the original poll's secret through getMessage above.
         for (const vote of update.pollUpdates) {
           if (!vote.pollUpdateMessageKey || !await currentIdentity.accepts(vote.pollUpdateMessageKey).catch(() => false) || closed || current !== epoch || !remember(vote.pollUpdateMessageKey.id)) continue;
           try {
             const result = await aggregate({ message: original.message, pollUpdates: [vote] });
             const selected = result.filter(v => v.voters?.length);
             if (!closed && current === epoch && selected.length === 1 && selected[0].name !== 'Unknown') emit({ type: 'message', id: vote.pollUpdateMessageKey.id, text: '', poll: { id: key.id, option: selected[0].name } });
-          } catch { /* Reject malformed or undecipherable votes. */ }
+          } catch {}
         }
       }
     });
@@ -120,7 +114,6 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
     if (!ready) throw Error(t(locale, 'disconnected'));
     const current = epoch, target = socket;
     if (m.op === 'logout') {
-      // The session ends on WhatsApp too; the loggedOut close above resets storage and shows a new QR.
       await target.logout();
       return null;
     }
@@ -129,7 +122,6 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
     const destination = await (chosen?.identity ?? identity).destination();
     if (closed || !ready || current !== epoch) throw Error(t(locale, 'disconnected'));
     if (m.op === 'group') {
-      // The authorized number is always a member; others are the caller's own bot numbers.
       const owners = await Promise.all(identities.slice(1).map(x => x.identity.destination().catch(() => undefined)));
       const members = [...new Set([destination, ...owners.filter(Boolean), ...m.participants.map(p => `${p}@s.whatsapp.net`)])];
       const created = await target.groupCreate(prefix(m.subject).slice(0, 100), members);
@@ -138,7 +130,6 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
       return created.id;
     }
     if (m.op === 'adopt') {
-      // Another bot's session created the group with this account in it; confirm membership before trusting it.
       const meta = await target.groupMetadata(m.group);
       const self = jidNormalizedUser(target.user?.id || '');
       if (!meta?.participants?.some(p => jidNormalizedUser(p.id || p.jid || '') === self || jidNormalizedUser(p.phoneNumber || '') === self)) throw Error(t(locale, 'notMember'));

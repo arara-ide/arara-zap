@@ -25,9 +25,7 @@ test('QR appears only after authentication and locale reaches the WhatsApp adapt
   assert.equal(f.events[0].locale, 'es'); assert.equal(f.events[0].allowed(), number);
   f.events[0].emit({ type: 'message', text: '!arara', id: 'message' }); assert.equal((await c.next()).text, '!arara');
   const result = c.next(); c.ws.send(JSON.stringify({ id: 'send', op: 'send', text: 'hello' })); assert.equal((await result).type, 'result');
-  // Imagem grande (acima do limite antigo de 32 KB) passa depois da autenticação.
   const image = c.next(); c.ws.send(JSON.stringify({ id: 'image', op: 'image', mimeType: 'image/png', caption: 'print', data: Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(200000)]).toString('base64') })); assert.equal((await image).type, 'result');
-  // Client and server close events can arrive in either order across platforms.
   const closed = once(c.ws, 'close'); c.ws.close(); await closed; await f.events[0].closed; assert.equal(f.closed.length, 1);
 });
 test('HTTP endpoints and browser-origin upgrades expose no service data', async t => {

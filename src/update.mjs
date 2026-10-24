@@ -65,7 +65,6 @@ export async function updateInstallation({ directory, locale = 'en', signal, fet
   signal.throwIfAborted();
   const current = await installation(directory);
   if (!current) throw Error(t(locale, 'invalid'));
-  // Check before network or mutation. The service must not update files under a live process.
   if (isProcessLocked(join(dataDirectory, 'process.lock'))) throw Error(t(locale, 'busy'));
   report(t(locale, 'checking'));
   let latest;
@@ -75,7 +74,6 @@ export async function updateInstallation({ directory, locale = 'en', signal, fet
   if (docker) { report(t(locale, 'docker', latest)); return { updated: false, version: current.version, reason: 'docker' }; }
   const source = await run('git', ['remote', 'get-url', 'origin'], directory, signal).catch(() => '');
   const dirty = await run('git', ['status', '--porcelain', '--untracked-files=all'], directory, signal).catch(() => 'dirty');
-  // Never overwrite hand-edited source, or a repository belonging to someone else.
   if (![SOURCE, 'git@github.com:arara-ide/arara-zap.git'].includes(source) || dirty) { report(t(locale, 'dirty')); return { updated: false, version: current.version, reason: 'dirty' }; }
   const lock = `${directory}.update-lock`;
   const releaseLock = acquireProcessLock(lock, t(locale, 'busy'));
@@ -102,11 +100,9 @@ export async function updateInstallation({ directory, locale = 'en', signal, fet
       const stat = await lstat(sourceFile);
       if (!stat.isFile() || stat.isSymbolicLink()) throw Error('Invalid local file');
       await mkdir(dirname(targetFile), { recursive: true, mode: 0o700 });
-      // No ignored user file can replace a file shipped by the new release.
       await copyFile(sourceFile, targetFile, 1);
     }
     signal.throwIfAborted();
-    // Reject edits made while downloading, too. Keep the old directory as a recoverable backup.
     if (await run('git', ['status', '--porcelain', '--untracked-files=all'], directory, signal)) throw Error('Local changes');
     backup = `${directory}.backup-${Date.now()}`;
     await move(directory, backup);

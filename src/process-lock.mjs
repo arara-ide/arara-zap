@@ -20,7 +20,6 @@ function alive(lock) {
   try { value = JSON.parse(lock.raw); } catch { return true; }
   const pid = typeof value === 'number' ? value : value?.pid;
   if (!Number.isSafeInteger(pid) || pid <= 0) return true;
-  // Also handles old PID-only locks after a reboot, even when the PID was reused.
   if (lock.stat.mtimeMs < Date.now() - uptime() * 1000 - 5000) return false;
   try { process.kill(pid, 0); }
   catch (error) { if (error.code === 'ESRCH') return false; return true; }
@@ -34,10 +33,8 @@ export function isProcessLocked(path) {
   const lock = readLock(path);
   return !!lock && alive(lock);
 }
-/** Recover dead owners, retain live/unknown owners and remove only our own lock. */
 export function acquireProcessLock(path, message = 'Arara Zap is already running.') {
   const value = JSON.stringify({ pid: process.pid, identity: linuxIdentity(process.pid), nonce: randomUUID() });
-  // Publish a complete record atomically; a crash cannot leave a new empty lock.
   const candidate = `${path}.${process.pid}.${randomUUID()}`;
   writeFileSync(candidate, value, { flag: 'wx', mode: 0o600 });
   try {

@@ -2,7 +2,6 @@ import { t } from './i18n.mjs';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { BufferJSON, initAuthCreds, proto } from '@whiskeysockets/baileys';
-// One encrypted atomic snapshot; serialized writes prevent lost key updates.
 export async function authStore(path, key, locale = 'en') {
   let data;
   try {

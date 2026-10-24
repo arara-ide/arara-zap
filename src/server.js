@@ -4,7 +4,6 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 import { verify, validateCommand } from './security.js';
-/** Antes do login só cabem mensagens pequenas; imagens (base64) só depois de autenticar. */
 const MAX_UNAUTHENTICATED = 32768;
 const MAX_MESSAGE = 12 * 1024 * 1024;
 const serverVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
