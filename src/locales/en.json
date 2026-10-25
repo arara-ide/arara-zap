@@ -27,9 +27,6 @@
   "stopped": "Service stopped",
   "disconnected": "WhatsApp disconnected",
   "lock": "Arara Zap is already running, or a previous session was interrupted. Check the service before removing process.lock.",
-  "unauthorizedNumber": "Number not authorized.",
-  "groupNotCreated": "Group not created.",
-  "notMember": "This account is not in the group.",
   "messageUnavailable": "Previous message unavailable for editing.",
   "invalidImage": "Invalid image."
 }

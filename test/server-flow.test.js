@@ -21,9 +21,9 @@ async function setup(t) {
 }
 test('QR appears only after authentication and locale reaches the WhatsApp adapter', { timeout: 5000 }, async t => {
   const f = await setup(t), c = await f.connect({ locale: 'es-MX' });
-  assert.deepEqual(await c.ready, { type: 'ready', serverVersion: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version, features: ['image', 'account', 'logout', 'group', 'adopt'] }); assert.equal((await c.next()).type, 'qr'); assert.equal((await c.next()).status, 'Esperando WhatsApp');
+  assert.deepEqual(await c.ready, { type: 'ready', serverVersion: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version, features: ['image'] }); assert.equal((await c.next()).type, 'qr'); assert.equal((await c.next()).status, 'Esperando WhatsApp');
   assert.equal(f.events[0].locale, 'es'); assert.equal(f.events[0].allowed(), number);
-  f.events[0].emit({ type: 'message', text: '!arara', id: 'message' }); assert.equal((await c.next()).text, '!arara');
+  f.events[0].emit({ type: 'message', text: 'arara', id: 'message' }); assert.equal((await c.next()).text, 'arara');
   const result = c.next(); c.ws.send(JSON.stringify({ id: 'send', op: 'send', text: 'hello' })); assert.equal((await result).type, 'result');
   const image = c.next(); c.ws.send(JSON.stringify({ id: 'image', op: 'image', mimeType: 'image/png', caption: 'print', data: Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(200000)]).toString('base64') })); assert.equal((await image).type, 'result');
   const closed = once(c.ws, 'close'); c.ws.close(); await closed; await f.events[0].closed; assert.equal(f.closed.length, 1);
