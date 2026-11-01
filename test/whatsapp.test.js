@@ -117,3 +117,12 @@ test('reset storage failures stop pairing without unhandled rejection', async ()
   await tick(); assert.equal(f.sockets.length, 1); assert.equal(f.adapter.snapshot().ready, false);
   assert.match(f.events.at(-1).status, /save|storage/i); f.adapter.close();
 });
+test('notices go only to the notice number set for the connection, never to arbitrary recipients', async t => {
+  const f = setup(); t.after(f.adapter.close); const socket = f.sockets[0];
+  socket.ev.emit('connection.update', { connection: 'open' });
+  await assert.rejects(f.adapter.command({ op: 'notice', text: 'done' }));
+  assert.equal(await f.adapter.command({ op: 'noticeTarget', number: '5521988887777' }), null);
+  await f.adapter.command({ op: 'notice', text: 'done' });
+  await f.adapter.command({ op: 'send', text: 'reply' });
+  assert.deepEqual(socket.sent.map(m => [m.jid, m.content.text]), [['5521988887777@s.whatsapp.net', '🦜 | done'], ['5511999999999@s.whatsapp.net', '🦜 | reply']]);
+});

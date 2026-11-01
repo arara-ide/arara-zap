@@ -127,7 +127,7 @@ No modo **Em servidor**, a IDE verifica a versão informada pelo serviço após 
 
 ## Protocolo v1
 
-Servidor envia `{type:"challenge",version:1,nonce}`. Cliente responde `{type:"auth",number,proof}`; proof é HMAC-SHA256 da string `arara-zap/v1:<nonce>:<number>`, com chave scrypt(senha, `arara-zap/v1`, 32). Após `{type:"ready",serverVersion:"X.Y.Z"}`, aceita `{id,op:"send",text}`, `{id,op:"poll",title,values}`, `{id,op:"edit",messageId,text}` e `{id,op:"image",data,mimeType,caption}`; retorna `{type:"result",id,result,error?}`. `send` retorna o ID da mensagem. `edit` só aceita ID de texto enviado ao destino autorizado pelo socket atual. Eventos: `qr`, `status`, `message` e votos como `message.poll={id,option}`. Nenhuma operação permite definir outro destinatário.
+Servidor envia `{type:"challenge",version:1,nonce}`. Cliente responde `{type:"auth",number,proof}`; proof é HMAC-SHA256 da string `arara-zap/v1:<nonce>:<number>`, com chave scrypt(senha, `arara-zap/v1`, 32). Após `{type:"ready",serverVersion:"X.Y.Z"}`, aceita `{id,op:"send",text}`, `{id,op:"poll",title,values}`, `{id,op:"edit",messageId,text}` e `{id,op:"image",data,mimeType,caption}`; retorna `{type:"result",id,result,error?}`. `send` retorna o ID da mensagem. `edit` só aceita ID de texto enviado ao destino autorizado pelo socket atual. Eventos: `qr`, `status`, `message` e votos como `message.poll={id,option}`. Avisos (`ready.features` com `notice`): `{id,op:"noticeTarget",number}` fixa, para esta conexão, um único número que só recebe avisos, e `{id,op:"notice",text}` envia o texto a ele. Esse número nunca envia comandos nem votos. Nenhuma outra operação permite definir outro destinatário.
 
 ```sh
 npm test

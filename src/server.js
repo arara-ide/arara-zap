@@ -35,7 +35,7 @@ export function createZapServer({ key, locale = 'en', host = '127.0.0.1', port =
           if (m.type !== 'auth' || !/^\d{10,15}$/.test(m.number) || (number && number !== m.number) || !verify(key, nonce, m.number, m.proof) || owner) { ws.close(1008, t(locale, 'authFailed')); return; }
           clientLocale = language(m.locale || locale);
           authenticated = true; clearTimeout(timeout); owner = ws; allowed = m.number;
-          send(ws, { type: 'ready', serverVersion, features: ['image'] });
+          send(ws, { type: 'ready', serverVersion, features: ['image', 'notice'] });
           adapter ||= adapterFactory(value => { if (owner) send(owner, value); }, () => allowed, clientLocale);
           const snapshot = adapter.snapshot();
           if (snapshot.qr) send(ws, { type: 'qr', qr: snapshot.qr });

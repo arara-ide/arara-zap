@@ -15,10 +15,12 @@ export function imageMatches(buf, mimeType) {
 }
 export function validateCommand(m) {
   if (!m || typeof m !== 'object' || typeof m.id !== 'string' || !/^[\w-]{1,80}$/.test(m.id)) throw Error('Invalid request');
-  const allowed = m.op === 'send' ? ['id', 'op', 'text'] : m.op === 'edit' ? ['id', 'op', 'messageId', 'text'] : m.op === 'image' ? ['id', 'op', 'data', 'mimeType', 'caption'] : ['id', 'op', 'title', 'values'];
+  const allowed = m.op === 'send' || m.op === 'notice' ? ['id', 'op', 'text'] : m.op === 'noticeTarget' ? ['id', 'op', 'number'] : m.op === 'edit' ? ['id', 'op', 'messageId', 'text'] : m.op === 'image' ? ['id', 'op', 'data', 'mimeType', 'caption'] : ['id', 'op', 'title', 'values'];
   if (Object.keys(m).some(k => !allowed.includes(k))) throw Error('Invalid request');
   const prefixedLength = text => text.startsWith('🦜 | ') ? text.length : text.length + '🦜 | '.length;
   if (m.op === 'send' && typeof m.text === 'string' && m.text.length > 0 && prefixedLength(m.text) <= 3500) return m;
+  if (m.op === 'notice' && typeof m.text === 'string' && m.text.length > 0 && prefixedLength(m.text) <= 3500) return m;
+  if (m.op === 'noticeTarget' && typeof m.number === 'string' && /^\d{10,15}$/.test(m.number)) return m;
   if (m.op === 'edit' && typeof m.messageId === 'string' && /^[\w-]{1,120}$/.test(m.messageId) && typeof m.text === 'string' && m.text.length > 0 && prefixedLength(m.text) <= 3500) return m;
   if (m.op === 'image' && typeof m.data === 'string' && m.data.length > 0 && m.data.length <= MAX_IMAGE_BASE64 && /^[A-Za-z0-9+/]+={0,2}$/.test(m.data) && IMAGE_TYPES.includes(m.mimeType) && typeof m.caption === 'string' && prefixedLength(m.caption) <= 1024) return m;
   if (m.op === 'poll' && typeof m.title === 'string' && m.title.length > 0 && prefixedLength(m.title) <= 200 && Array.isArray(m.values) && m.values.length >= 2 && m.values.length <= 12 && new Set(m.values).size === m.values.length && m.values.every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)) return m;
