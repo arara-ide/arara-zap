@@ -9,7 +9,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
   const schedule = deps.schedule || setTimeout, cancel = deps.cancel || clearTimeout;
   const debug = value => { if (process.env.ZAP_DEBUG === '1') console.log(`[zap-debug] ${value}`); };
   let epoch = 0;
-  let socket, identity, timer, closed = false, ready = false, qr, retry = 0;
+  let socket, identity, noticeNumber, noticeIdentity, timer, closed = false, ready = false, qr, retry = 0;
   const polls = new Map(), seen = new Map(), sentTexts = new Map();
   const prefix = text => text.startsWith('🦜 | ') ? text : `🦜 | ${text}`;
   const remember = id => { if (!id || seen.has(id)) return false; seen.set(id, Date.now()); if (seen.size > 2000) seen.delete(seen.keys().next().value); return true; };
@@ -100,6 +100,16 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
     const current = epoch, target = socket;
     const destination = await identity.destination();
     if (closed || !ready || current !== epoch) throw Error(t(locale, 'disconnected'));
+    if (m.op === 'noticeTarget') { noticeNumber = m.number; noticeIdentity = undefined; return null; }
+    if (m.op === 'notice') {
+      if (!noticeNumber) throw Error(t(locale, 'disconnected'));
+      if (!noticeIdentity || noticeIdentity.socket !== target || noticeIdentity.number !== noticeNumber) noticeIdentity = { socket: target, number: noticeNumber, identity: whatsappIdentity(target, noticeNumber) };
+      const recipient = await noticeIdentity.identity.destination();
+      if (closed || !ready || current !== epoch) throw Error(t(locale, 'disconnected'));
+      const sent = await target.sendMessage(recipient, { text: prefix(m.text) });
+      debug('outgoing-completed notice');
+      return sent.key.id;
+    }
     if (m.op === 'edit') {
       const previous = sentTexts.get(m.messageId);
       if (!previous || previous.destination !== destination || previous.socket !== target || !m.text.startsWith(previous.text)) throw Error(t(locale, 'messageUnavailable'));

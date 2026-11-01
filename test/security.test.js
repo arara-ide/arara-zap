@@ -52,3 +52,10 @@ test('WebSocket authenticates before exposing QR or messages, limits destination
   assert.equal((await edited).result, 'poll-id'); assert.deepEqual(commands[1], { id: 'edit', op: 'edit', messageId: 'sent-id', text: '🦜 | resposta\n\nPedido encerrado.' });
   const rejected = new Promise(resolve => ws.once('close', resolve)); ws.send(JSON.stringify({ id: 'two', op: 'execute', command: 'id' })); await rejected;
 });
+test('notice commands accept only text or a fixed notice number', () => {
+  assert.ok(validateCommand({ id: 'a', op: 'notice', text: 'hi' }));
+  assert.ok(validateCommand({ id: 'a', op: 'noticeTarget', number: '5511999999999' }));
+  assert.throws(() => validateCommand({ id: 'a', op: 'notice', text: 'hi', number: '5511999999999' }));
+  assert.throws(() => validateCommand({ id: 'a', op: 'noticeTarget', number: '+55 11' }));
+  assert.throws(() => validateCommand({ id: 'a', op: 'notice', text: '' }));
+});
