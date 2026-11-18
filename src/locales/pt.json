@@ -28,5 +28,9 @@
   "disconnected": "WhatsApp desconectado",
   "lock": "Arara Zap já está em execução, ou a sessão anterior foi interrompida. Confira o serviço antes de remover process.lock.",
   "messageUnavailable": "Mensagem anterior indisponível para edição.",
-  "invalidImage": "Imagem inválida."
+  "editTooLong": "Mensagem editada excede o limite.",
+  "invalidImage": "Imagem inválida.",
+  "portInUse": "A porta {port} já está em uso.",
+  "portPermission": "Permissão negada para ouvir em {host}:{port}.",
+  "permissionDenied": "Permissão negada."
 }

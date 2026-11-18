@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { mkdtemp, readFile, writeFile, lstat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
+import { startupError } from '../src/errors.js';
 const root = new URL('..', import.meta.url);
 async function processFixture(t, env, prepare = async () => {}) {
   const data = await mkdtemp(join(tmpdir(), 'zap-startup-')); t.after(() => rm(data, { recursive: true, force: true }));
@@ -48,4 +51,40 @@ test('startup recovers an interrupted process and a second live startup cannot t
   assert.equal((await second.ended)[0], 1); assert.match(second.output(), /already running/);
   assert.equal(await readFile(join(f.data, 'process.lock'), 'utf8'), owner);
   f.child.send({ type: 'stop' }); assert.equal((await f.ended)[0], 0);
+});
+
+test('startup error helper maps EADDRINUSE and EACCES across languages', () => {
+  assert.equal(startupError(Object.assign(Error('listen EADDRINUSE'), { code: 'EADDRINUSE', port: 7310 }), 'pt-BR'), 'A porta 7310 já está em uso.');
+  assert.equal(startupError(Object.assign(Error('listen EADDRINUSE'), { code: 'EADDRINUSE', port: 7310 }), 'es'), 'El puerto 7310 ya está en uso.');
+  assert.equal(startupError(Object.assign(Error('listen EADDRINUSE'), { code: 'EADDRINUSE' }), 'en', { port: 7310 }), 'Port 7310 is already in use.');
+  assert.equal(startupError(Object.assign(Error('listen EACCES'), { code: 'EACCES', syscall: 'listen', port: 80 }), 'pt', { host: '127.0.0.1' }), 'Permissão negada para ouvir em 127.0.0.1:80.');
+  assert.equal(startupError(Object.assign(Error('open EACCES'), { code: 'EACCES', syscall: 'open' }), 'es'), 'Permiso denegado.');
+  assert.equal(startupError(Error('boom'), 'en'), 'boom');
+});
+
+test('port conflict prints localized error and cleans process lock', async t => {
+  const blocker = createServer();
+  await new Promise(resolve => blocker.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => blocker.close(resolve)));
+  const { port } = blocker.address();
+  const f = await processFixture(t, { ZAP_PORT: String(port), ZAP_LANG: 'pt-BR' });
+  assert.equal((await f.ended)[0], 1);
+  assert.match(f.output(), new RegExp(`A porta ${port} já está em uso\\.`));
+  assert.doesNotMatch(f.output(), /EADDRINUSE/);
+  await assert.rejects(lstat(join(f.data, 'process.lock')), { code: 'ENOENT' });
+});
+
+test('stopping before spawn prints localized cancellation instead of AbortError', async t => {
+  const data = await mkdtemp(join(tmpdir(), 'zap-abort-'));
+  t.after(() => rm(data, { recursive: true, force: true }));
+  const preload = join(data, 'preload.mjs');
+  await writeFile(preload, "globalThis.fetch = async () => { process.emit('message', { type: 'stop' }); return new Response('', { status: 404 }); };\n");
+  const child = spawn(process.execPath, ['--import', pathToFileURL(preload).href, 'src/run.js'], { cwd: root, env: { ...process.env, ZAP_DATA_DIR: data, ZAP_LANG: 'pt-BR', ZAP_SKIP_UPDATE: '0' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+  let output = '';
+  child.stdout.on('data', raw => output += raw);
+  child.stderr.on('data', raw => output += raw);
+  const [code] = await once(child, 'exit');
+  assert.equal(code, 1);
+  assert.match(output, /Atualização cancelada\./);
+  assert.doesNotMatch(output, /This operation was aborted/);
 });

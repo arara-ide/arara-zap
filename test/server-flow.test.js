@@ -40,6 +40,12 @@ test('wrong number, wrong password and replay cannot expose QR or start WhatsApp
   for (const extra of [{ number: '5511888888888' }, { proof: '0'.repeat(64) }]) {
     const c = await f.connect(extra); const close = once(c.ws, 'close'); await close; assert.equal(f.events.length, 0);
   }
+  for (const [locale, expected] of [['pt-BR', 'Autenticação inválida'], ['es-MX', 'Autenticación fallida'], ['de-DE', 'Authentication failed']]) {
+    const c = await f.connect({ proof: '0'.repeat(64), locale });
+    const [code, reason] = await once(c.ws, 'close');
+    assert.equal(code, 1008);
+    assert.equal(reason.toString(), expected);
+  }
   const first = await f.connect(); await first.ready; const oldProof = proof(f.key, first.challenge.nonce, number); const closed = once(first.ws, 'close'); first.ws.close(); await closed; await f.events[0].closed;
   const c = await f.connect({ proof: oldProof }); await once(c.ws, 'close'); assert.equal(f.events.length, 1);
 });

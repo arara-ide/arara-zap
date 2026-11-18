@@ -126,3 +126,11 @@ test('notices go only to the notice number set for the connection, never to arbi
   await f.adapter.command({ op: 'send', text: 'reply' });
   assert.deepEqual(socket.sent.map(m => [m.jid, m.content.text]), [['5521988887777@s.whatsapp.net', '🦜 | done'], ['5511999999999@s.whatsapp.net', '🦜 | reply']]);
 });
+test('edit limit errors follow the requested client language', async t => {
+  for (const [locale, expected] of [['en', /exceeds the limit/], ['pt', /excede o limite/], ['es', /excede el límite/]]) {
+    const f = setup(locale); t.after(f.adapter.close);
+    f.sockets[0].ev.emit('connection.update', { connection: 'open' });
+    const sentId = await f.adapter.command({ op: 'send', text: 'hello' });
+    await assert.rejects(f.adapter.command({ op: 'edit', messageId: sentId, text: `hello${'x'.repeat(3500)}` }), expected);
+  }
+});
