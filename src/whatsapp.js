@@ -113,7 +113,7 @@ export function whatsapp(auth, emit, allowed, locale = 'en', deps = {}) {
     if (m.op === 'edit') {
       const previous = sentTexts.get(m.messageId);
       if (!previous || previous.destination !== destination || previous.socket !== target || !m.text.startsWith(previous.text)) throw Error(t(locale, 'messageUnavailable'));
-      if (prefix(m.text).length > 3500) throw Error('Mensagem editada excede o limite.');
+      if (prefix(m.text).length > 3500) throw Error(t(locale, 'editTooLong'));
       await target.sendMessage(destination, { text: prefix(m.text), edit: previous.key });
       previous.text = m.text;
       debug('outgoing-completed edit');

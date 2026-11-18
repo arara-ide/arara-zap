@@ -32,8 +32,9 @@ export function createZapServer({ key, locale = 'en', host = '127.0.0.1', port =
         if (!authenticated && raw.length > MAX_UNAUTHENTICATED) throw Error('Too large');
         const m = JSON.parse(raw.toString());
         if (!authenticated) {
-          if (m.type !== 'auth' || !/^\d{10,15}$/.test(m.number) || (number && number !== m.number) || !verify(key, nonce, m.number, m.proof) || owner) { ws.close(1008, t(locale, 'authFailed')); return; }
-          clientLocale = language(m.locale || locale);
+          const requestedLocale = language(typeof m?.locale === 'string' && m.locale ? m.locale : locale);
+          if (m.type !== 'auth' || !/^\d{10,15}$/.test(m.number) || (number && number !== m.number) || !verify(key, nonce, m.number, m.proof) || owner) { ws.close(1008, t(requestedLocale, 'authFailed')); return; }
+          clientLocale = requestedLocale;
           authenticated = true; clearTimeout(timeout); owner = ws; allowed = m.number;
           send(ws, { type: 'ready', serverVersion, features: ['image', 'notice'] });
           adapter ||= adapterFactory(value => { if (owner) send(owner, value); }, () => allowed, clientLocale);
