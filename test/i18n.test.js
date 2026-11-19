@@ -21,3 +21,6 @@ test('JSON catalogs have the same keys and interpolation parameters without rely
   }
   assert.equal(t('en', 'updated', { version: '$& {host}' }), 'Updated to $& {host}.');
 });
+test('object prototype names are never treated as catalog messages', () => {
+  for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) assert.equal(t('pt', key), key);
+});

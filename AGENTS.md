@@ -13,7 +13,7 @@
 - Verifique paridade de chaves/parâmetros, fallback e variantes regionais, além dos testes/builds pertinentes. Catálogo incompleto ou texto ainda fixo deve ser informado como pendência, nunca declarado traduzido.
 - Serviço independente: mantenha resolução regional de `ZAP_LANG` e locale por conexão recebido da IDE, com fallback em inglês. Use catálogos estruturados versionados para mensagens de operação/atualização. Preserve protocolo, autenticação e isolamento entre conexões; o idioma de um cliente não muda o de outro.
 
-- Catálogos e validação: `src/locales/{en,pt,es}.json`; use `src/i18n.mjs` por conexão e preserve a cópia do runtime embarcado no Arara AI (`src/remote/runtime/`). Valide com `npm test && npm run build`.
+- Catálogos e validação: `src/locales/{en,pt,es}.json`; use `src/i18n.mjs` por conexão e lembre que `update.mjs`, `process-lock.mjs`, `i18n.mjs` e `src/locales/` são a fonte de `arara-ai/src/remote/runtime/` (o build do Arara AI copia com `npm run sync:zap`; o CI de lá falha se divergir). Valide com `npm test && npm run build`.
 
 # AGENTS.md — Arara Zap
 

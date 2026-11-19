@@ -32,7 +32,7 @@ export function language(locale = 'en') {
 const messages = { en, pt, es };
 export function t(locale, key, values = {}) {
   const selected = messages[language(locale)];
-  let text = selected[key] || messages.en[key] || key;
+  let text = (Object.hasOwn(selected, key) ? selected[key] : '') || (Object.hasOwn(messages.en, key) ? messages.en[key] : '') || key;
   text = text.replace(/\{(\w+)\}/g, (token, name) => Object.hasOwn(values, name) ? String(values[name]) : token);
   return text;
 }
