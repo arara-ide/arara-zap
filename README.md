@@ -1,5 +1,7 @@
 # Arara Zap
 
+> **Projeto arquivado.** O Arara App oferece uma experiência melhor para acompanhar e controlar o Arara Code pelo celular. Para fluxos no WhatsApp, o Arara Orchestra pode abrir o WhatsApp Web e realizar as mesmas tarefas de forma mais simples.
+
 Conecta o WhatsApp ao Arara Code diretamente por WebSocket. Node simples, sem API REST, painel web, banco externo ou relay no ac-services. Envie `arara` (sem distinguir maiúsculas) no WhatsApp para escolher projeto, assistente, modelo, esforço, aprovar ações e acompanhar respostas. A IDE precisa continuar aberta e o projeto precisa ser confiável.
 
 Base de conexão: [Baileys](https://github.com/WhiskeySockets/Baileys), também usado no wa-dialogue. Implementação independente, licença MIT. Integração não oficial do WhatsApp; compatibilidade depende do serviço e do Baileys.
